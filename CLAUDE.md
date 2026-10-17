@@ -31,4 +31,11 @@ solution is presented — completeness is not mandatory, but structure and reaso
 AI use is allowed but must be documented. **After every prompt in this project, append an entry
 to `PROMPTS.md`** containing the prompt verbatim (as the `<summary>` of a `<details>` dropdown)
 and Claude's answer inside the dropdown. Keep entries chronological, numbered, and never edit
-past entries.
+past entries. Answer user's question as concisely as possible by default. Claude's role here is
+more like an assistant than an agentic developer. Override this default behaviour if asked by the user.
+
+## Architecture graph rule
+
+`README.md` holds a Mermaid graph of the stack. **On every prompt, check whether the changes
+(containers, networks, volumes, ports, connections) require updating the graph**, and update it
+if so.

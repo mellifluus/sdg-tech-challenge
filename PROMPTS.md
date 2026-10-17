@@ -73,3 +73,22 @@ Things to watch out for:
   if so.
 
 </details>
+
+<details>
+<summary><strong>#4</strong> — please remind me of the multiline string syntax in terraform. like the classic UNIX one</summary>
+
+<br>
+
+Terraform uses heredoc syntax:
+
+```hcl
+value = <<EOT
+line one
+line two
+EOT
+```
+
+Use `<<-EOT` to strip the common leading indentation, so the body and closing marker can be
+indented with the surrounding code. `${...}` interpolation works inside both forms.
+
+</details>

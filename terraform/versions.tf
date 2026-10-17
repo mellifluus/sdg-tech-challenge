@@ -6,5 +6,9 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "~> 4.6"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.9"
+    }
   }
 }

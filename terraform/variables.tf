@@ -57,3 +57,21 @@ variable "minio_console_port" {
   type        = number
   default     = 9001
 }
+
+variable "minio_mc_image" {
+  description = "MinIO client image (this one has a shell for the bootstrap script)."
+  type        = string
+  default     = "cgr.dev/chainguard/minio-client@sha256:cd7f5d19d115615d809f27343b1e5cfbdc84f38e1c9a29475535b74ec5bade50"
+}
+
+variable "minio_buckets" {
+  description = "Buckets created by the bootstrap job."
+  type        = list(string)
+  default     = ["data-bucket"]
+}
+
+variable "minio_app_user" {
+  description = "Least-privilege MinIO user."
+  type        = string
+  default     = "app"
+}

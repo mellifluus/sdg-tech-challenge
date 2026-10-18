@@ -18,3 +18,12 @@ output "console_url" {
 output "volume_name" {
   value = docker_volume.data.name
 }
+
+output "buckets" {
+  value = var.buckets
+}
+
+output "bootstrap_exit_code" {
+  description = "Exit code of the bootstrap job."
+  value       = docker_container.bootstrap.exit_code
+}

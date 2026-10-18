@@ -92,3 +92,105 @@ Use `<<-EOT` to strip the common leading indentation, so the body and closing ma
 indented with the surrounding code. `${...}` interpolation works inside both forms.
 
 </details>
+
+<details>
+<summary><strong>#5</strong> — so the challenge states everything needs to be provisioned in one command. that basically means that using the minio provider to create the required data bucket is out of the question. is there any way to run a startup job or similar that fails the terraform apply if it doesn't succeed? if so, what should i search for? if not, any advice?</summary>
+
+<br>
+
+The minio provider is not ruled out. Terraform can configure a provider from resources in the
+same config. The problem here is `random_password`: the minio provider's password is unknown at
+first plan, which providers handle badly. A static endpoint plus `depends_on` would otherwise
+work in one apply.
+
+Yes, a startup job that fails the apply is possible. Two options:
+
+1. **One-shot `minio/mc` container (recommended).** Run a `docker_container` with
+   `command = ["sh", "-c", "mc alias set local http://minio:9000 $USER $PASS && mc mb --ignore-existing local/data-bucket"]`,
+   `attach = true`, `must_run = false` and `logs = true`. The provider does not fail on a
+   non-zero exit by itself. Add `lifecycle { postcondition { condition = self.exit_code == 0 } }`
+   so it does. MinIO must be ready first: give it a `healthcheck`, and use `wait = true` on the
+   MinIO container (or a retry loop in the script).
+   Search for: *kreuzwerker docker_container attach exit_code*, *terraform lifecycle
+   postcondition*, *docker_container wait healthcheck*.
+2. **`terraform_data` + `local-exec` provisioner** that runs `docker exec <minio> mc mb ...`.
+   A non-zero exit fails the apply. It needs the docker CLI on the host and is less declarative.
+   Search for: *terraform_data local-exec provisioner*.
+
+To re-run the job on rebuilds, add `replace_triggered_by` pointing at the MinIO container.
+
+</details>
+
+<details>
+<summary><strong>#6</strong> — finally managed to make the bootstrap job for minio work. is there anything worth adding there?</summary>
+
+<br>
+
+Reviewed `modules/minio/bootstrap.tf` and `bootstrap.sh.tftpl`. The design is solid. Suggestions,
+most important first:
+
+1. **Re-runs probably break on `policy attach`.** `mc admin policy attach` fails with "policy
+   change is already in effect" when the policy is already attached. That happens whenever the
+   job runs again against a persisted volume (MinIO container replaced, bucket list changed).
+   With `set -e` the apply then fails. Tolerate that case only:
+   `mc admin policy attach ... || mc admin user info local "${app_user}" | grep -qw ${policy_name}`.
+   Test with `terraform apply -replace=module.minio.docker_container.minio`.
+2. **Bound the wait.** `mc ready local` can block forever and hang the apply. Use
+   `timeout 120 mc ready local`.
+3. **A failed job may stay failed.** The exited container is saved in state, so the next plan
+   likely fails the postcondition again without re-running it. Add the fix to the error message:
+   `terraform apply -replace=module.minio.docker_container.bootstrap`.
+4. **Self-validate the requirement.** End with `mc stat local/data-bucket` (or loop `mc stat`
+   over the buckets) so the job also proves the acceptance criterion.
+5. **Credentials in env.** The exited container keeps the root credentials in its env
+   (`docker inspect`). For a local setup this is acceptable. You could upload an
+   `mc` config file instead.
+6. Minor: typo `creatig`. `MINIO_ENDPOINT` is only echoed; use the module's internal endpoint
+   in one place. Run `terraform fmt` (alignment in `main.tf`). shellcheck does not see
+   `.tftpl` files.
+
+Optional: enable versioning on `data-bucket` (`mc version enable`), and add a MinIO
+`healthcheck` for the monitoring nice-to-have.
+
+Also updated the README Mermaid graph: MinIO container, data volume, bootstrap job, host ports.
+
+</details>
+
+<details>
+<summary><strong>#7</strong> — addressing feedback. 1. tried running terraform apply -replace=module.minio.docker_container.minio after a full apply but everything succeded. are you saying it will break when i add storage persistence? 2. the image doesn't ship with timeout. added a timeout to the bootstrap resource in terraform. should work the same, right? 3. i don't understand your feedback. 4. i plan to add smoke tests later, no need 5. that's alright for this challenge. also added versioning with a variable, looks good?</summary>
+
+<br>
+
+1. **The earlier claim was wrong.** Persistence already works: `sdg-minio-data` is a named
+   volume and survives the replace. Re-ran the existing job with `docker start -a
+   sdg-minio-bootstrap` against the existing data. `policy attach` succeeds when the policy is
+   already attached, and the job exits 0. Nothing to change.
+2. **Mostly the same.** The `timeouts.create` deadline covers the provider waiting on the
+   attached container. Differences: the error is a deadline error, not your postcondition
+   message, and the timed-out container keeps running. Terraform should mark it tainted, so the
+   next apply replaces it. To test, point `MC_HOST_local` at a wrong host for one apply. Also
+   remove the trailing whitespace on the blank line before `timeouts` (pre-commit will flag it).
+3. **Clarified.** A job that exits non-zero is still created and saved in state. The open
+   question is what the next `terraform apply` does when nothing in the config changed:
+   - The container is tainted: it gets replaced and the job re-runs. Fine.
+   - It is not tainted: the postcondition fails again at plan time from the saved
+     `exit_code`, and the job never re-runs. Then you need `-replace`.
+
+   Not sure which one Terraform 1.16 does. Test: add `exit 1` to the script, apply (fails),
+   then run `terraform plan`. If the plan says "tainted, must be replaced", drop this point.
+4. / 5. Noted.
+
+**Versioning:**
+- **Bug:** `main.tf` does not pass `bucket_versioning = var.minio_bucket_versioning`, so the
+  root variable is ignored and the module default (`true`) always applies. Pass it, and remove
+  the module default so it matches the other module inputs.
+- Setting it to `false` later does not turn versioning off, because the script only enables it.
+  Add `%{ else ~}` + `mc version suspend "local/$${bucket}"` so the flag is applied both ways.
+  (A MinIO bucket can only be suspended, never set back to unversioned.)
+- Optional: with versioning on, every overwrite and delete keeps the old version. A lifecycle
+  rule (`mc ilm rule add --noncurrent-expire-days N`) stops the storage from growing without
+  limit.
+
+No graph change needed.
+
+</details>

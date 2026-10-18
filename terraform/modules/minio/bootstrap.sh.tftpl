@@ -1,0 +1,20 @@
+#!/bin/sh
+# MinIO idempotent bootstrap job, rendered by Terraform
+set -eu
+
+echo "waiting for MinIO"
+mc ready local
+
+for bucket in ${buckets}; do
+  echo "creatig bucket '$${bucket}'"
+  mc mb --ignore-existing "local/$${bucket}"
+  mc anonymous set none "local/$${bucket}"
+  mc version enable "local/$${bucket}"
+done
+
+echo "creating least-privilege user '${app_user}'"
+mc admin policy create local ${policy_name} /bootstrap/policy.json
+mc admin user add local "${app_user}" "$${APP_USER_PASSWORD}"
+mc admin policy attach local ${policy_name} --user "${app_user}"
+
+echo "done"

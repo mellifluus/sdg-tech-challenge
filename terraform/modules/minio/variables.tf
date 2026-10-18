@@ -46,3 +46,24 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "mc_image" {
+  description = "MinIO client image used by the bootstrap job (needs a shell)."
+  type        = string
+}
+
+variable "buckets" {
+  description = "Buckets to create."
+  type        = list(string)
+}
+
+variable "app_user" {
+  description = "Least-privilege user for applications/pipelines."
+  type        = string
+}
+
+variable "app_password" {
+  description = "Password for app_user."
+  type        = string
+  sensitive   = true
+}

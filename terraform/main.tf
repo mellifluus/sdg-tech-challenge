@@ -40,4 +40,8 @@ module "minio" {
   api_port      = var.minio_api_port
   console_port  = var.minio_console_port
   labels        = local.common_labels
+  mc_image      = var.minio_mc_image
+  buckets       = var.minio_buckets
+  app_user      = var.minio_app_user
+  app_password  = random_password.minio_app.result
 }

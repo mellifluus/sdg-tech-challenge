@@ -45,3 +45,28 @@ module "minio" {
   app_user      = var.minio_app_user
   app_password  = random_password.minio_app.result
 }
+
+# DB
+
+module "postgres" {
+  source = "./modules/postgres"
+
+  name_prefix        = var.project_name
+  image              = var.postgres_image
+  network_name       = docker_network.data.name
+  bind_address       = var.bind_address
+  port               = var.postgres_port
+  superuser_password = random_password.postgres["superuser"].result
+  labels             = local.common_labels
+
+  databases = {
+    (var.orchestrator_db_name) = {
+      description = "orchestrator metadata"
+      password    = random_password.postgres["orchestrator"].result
+    }
+    (var.warehouse_db_name) = {
+      description = "destination warehouse"
+      password    = random_password.postgres["warehouse"].result
+    }
+  }
+}

@@ -75,3 +75,29 @@ variable "minio_app_user" {
   type        = string
   default     = "app"
 }
+
+# POSTGRESQL
+
+variable "postgres_image" {
+  description = "PostgreSQL image."
+  type        = string
+  default     = "postgres:17.6-alpine"
+}
+
+variable "postgres_port" {
+  description = "Host port for PostgreSQL."
+  type        = number
+  default     = 5432
+}
+
+variable "orchestrator_db_name" {
+  description = "Database (and owner role) holding the orchestrator metadata."
+  type        = string
+  default     = "airflow"
+}
+
+variable "warehouse_db_name" {
+  description = "Destination database (and owner role) where pipelines load data."
+  type        = string
+  default     = "warehouse"
+}

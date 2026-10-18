@@ -11,3 +11,10 @@ resource "random_password" "minio_app" {
   length  = 32
   special = false
 }
+
+resource "random_password" "postgres" {
+  for_each = toset(["superuser", "orchestrator", "warehouse"])
+
+  length  = 32
+  special = false
+}

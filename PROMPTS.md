@@ -194,3 +194,52 @@ Also updated the README Mermaid graph: MinIO container, data volume, bootstrap j
 No graph change needed.
 
 </details>
+
+<details>
+<summary><strong>#8</strong> — i went for a bootstrap job for postgresql too. it had the same issue as minio - first plan would fail. i added two lines at the end of the for database loop, that I found in an old project where I was studying database hardening. I'm not sure what they do, would be great if you explained and told me if they make sense here</summary>
+
+**`REVOKE ALL ON DATABASE "x" FROM PUBLIC;`**
+`PUBLIC` means every role, including roles created later. When Postgres creates a database, it
+gives `PUBLIC` the `CONNECT` and `TEMPORARY` privileges on it by default. So without this line,
+the `orchestrator` user can log in to `warehouse` and the other way round. This line removes
+that default. After it, only the owner and superusers can connect.
+
+**`GRANT CONNECT, TEMPORARY ON DATABASE "x" TO "x";`**
+This gives those two privileges back to the database's own role. It changes nothing in
+practice: the role owns the database (`CREATE DATABASE ... OWNER`), and an owner already has
+every privilege on its database. It is harmless and documents intent. Keep it if you like
+being explicit, or drop it.
+
+**Do they make sense here?** Yes. They give least privilege between the two tenants: the
+orchestrator's metadata and the warehouse data share one instance, but each user can only
+reach its own database. Both statements are idempotent, so re-running the job is safe. One
+thing to remember: when the orchestrator runs pipelines that write to the warehouse, it must
+use the **warehouse** credentials, not its own role.
+
+Graph updated: added the `postgres` and `postgres-bootstrap` containers, the `sdg-postgres-data`
+volume and host port 5432.
+
+</details>
+
+<details>
+<summary><strong>#9</strong> — can you create a makefile at the root of the project? it should have all the classics like .PHONY, help etc and make it easier for me to just run terraform commands from the root of the project. also lint, fmt, and possibly a make credentials command that prints out all the credentials that i need to test this</summary>
+
+Added a root `Makefile` that runs Terraform with `terraform -chdir=terraform`, so you can run every
+command from the repository root. Running `make` with no target prints the help.
+
+| Target | What it does |
+|---|---|
+| `init` / `validate` / `plan` / `apply` / `destroy` / `output` | Runs the Terraform command of the same name. Extra flags go in `ARGS="..."` |
+| `up` / `down` | Runs `apply` or `destroy` with `-auto-approve` (the single-command deploy) |
+| `credentials` | Prints the MinIO URLs, users and passwords, and the password of each Postgres role, read from `terraform output -json` with `jq`. If nothing is deployed yet, it tells you to run `make up` first |
+| `fmt` / `fmt-check` | Runs `terraform fmt -recursive`. `fmt-check` only reports and suits CI |
+| `lint` | Runs `fmt-check`, then `validate`, then `tflint --recursive` with the repository's `.tflint.hcl` |
+| `pre-commit` | Runs all pre-commit hooks on every file |
+| `clean` | Deletes the `.terraform/` directories but keeps the state |
+
+The `credentials` target needs `jq`. `shellcheck` is not installed locally, so the pre-commit
+shellcheck hook relies on the pip-installed copy.
+
+No graph change needed.
+
+</details>

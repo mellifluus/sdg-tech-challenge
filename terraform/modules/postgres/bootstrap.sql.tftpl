@@ -1,0 +1,18 @@
+-- PostgreSQL idempotent bootstrap job, rendered by Terraform
+\set ON_ERROR_STOP on
+
+%{ for db in databases }
+SELECT format('CREATE ROLE %I LOGIN', '${db}')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${db}')\gexec
+
+-- always apply the password so it always matches the Terraform state
+\getenv pw_${db} PW_${db}
+ALTER ROLE "${db}" WITH LOGIN PASSWORD :'pw_${db}';
+
+SELECT format('CREATE DATABASE %I OWNER %I', '${db}', '${db}')
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${db}')\gexec
+
+REVOKE ALL ON DATABASE "${db}" FROM PUBLIC;
+GRANT CONNECT, TEMPORARY ON DATABASE "${db}" TO "${db}";
+
+%{ endfor }

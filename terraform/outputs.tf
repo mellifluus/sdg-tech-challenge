@@ -32,6 +32,7 @@ output "minio_app_password" {
 output "postgres" {
   description = "PostgreSQL connection info (passwords: terraform output postgres_passwords)."
   value = {
+    container_name    = module.postgres.container_name
     host_endpoint     = module.postgres.host_endpoint
     internal_host     = module.postgres.internal_host
     databases         = module.postgres.databases
@@ -49,4 +50,14 @@ output "postgres_passwords" {
     (var.warehouse_db_name)    = random_password.postgres["warehouse"].result
   }
   sensitive = true
+}
+
+output "mc_image" {
+  description = "MinIO client image."
+  value       = var.minio_mc_image
+}
+
+output "postgres_image" {
+  description = "PostgreSQL image (also provides psql / pg_isready)."
+  value       = var.postgres_image
 }

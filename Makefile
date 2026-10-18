@@ -7,7 +7,7 @@ TF_DIR := terraform
 TF     := terraform -chdir=$(TF_DIR)
 ARGS   ?=
 
-.PHONY: help init validate plan apply up destroy down output credentials fmt fmt-check lint pre-commit clean
+.PHONY: help init validate plan apply up destroy down output credentials test fmt fmt-check lint pre-commit clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m [ARGS=\"...\"]\n\n"} \
@@ -56,6 +56,9 @@ credentials: ## Print endpoints and credentials needed to test the stack
 		(.postgres_passwords.value | to_entries[] | \
 			"  \(.key | . + ":" | .[0:14] + (" " * (14 - length)))  \(.value)") \
 	' <<< "$$out"
+
+test: ## Run the integration tests against the deployed stack
+	./tests/run.sh
 
 ## Code quality
 

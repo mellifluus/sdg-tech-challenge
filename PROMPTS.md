@@ -243,3 +243,46 @@ shellcheck hook relies on the pip-installed copy.
 No graph change needed.
 
 </details>
+
+<details>
+<summary><strong>#10</strong> — i wanna add some sort of automated testing that could also run on a ci/cd environment. i was thinking of a shell script, that uses the mc client image and the postgres image to test everything works. i added them to the tf outputs. we should test the following:
+MinIO: api and web console healthcheck, check data-bucket exists and versioning is on, make app user upload some fixture to the data-bucket ( you just add some sample data to the repo ) and check the data is in the bucket afterwards. finally, check app user privileges like creating other buckets.
+PostgreSQL: healthcheck, check connection with each user of each database and check connections of each user to the other database.
+e2e: create a new table in the warehouse database, if it doesn't exist. stream the fixture out of the bucket, put the data in the table, finally check it exists.
+
+i think im covering everything. everything is up currently, so you can probably test while you go. if im missing something, ask before adding and let's discuss about it</summary>
+
+Added `tests/run.sh`, `tests/fixtures/orders.csv` (10 orders) and a `make test` target. Ran it against the live stack: **16 passed, 0 failed**. A second run also passed, so the script is idempotent.
+
+The script reads all its config from `terraform output -json`. It runs `mc` / `psql` in throwaway
+containers on `sdg-data` and passes secrets by env var name only. The exit code is the number of failed checks.
+
+- **MinIO**: `curl` against the published ports (`/minio/health/ready` on 9000, `/` on 9001),
+  bucket exists, `versioning.status == Enabled`, app user `mc pipe`s the fixture, then root
+  `mc cat`s it back and the sha256 is compared on the host. Checks that the app user is denied `mc mb` and `mc admin`.
+- **PostgreSQL**: `pg_isready`, plus a 2×2 matrix: each role can connect to its own DB and is denied the other. I confirmed the denials fail with "permission denied for database" and "Access Denied", not with some unrelated error.
+- **E2E**: `CREATE TABLE IF NOT EXISTS e2e_orders`, then `mc cat | psql -1 -c TRUNCATE -c "\copy … FROM pstdin"`. That is one
+  transaction, so re-runs don't duplicate rows. Then it compares `count|sum(qty*price)` with values computed from the CSV using awk.
+
+Notes:
+- Only `mc_image` was in the outputs, so I added a `postgres_image` output.
+- Coreutils inside the Chainguard mc image (`ls`, `cat`, `wc`, `head`) crash with *Illegal instruction* on
+  this machine (arm64). `mc` works, so the script only runs `mc` in that container and computes checksums on the host.
+
+Open points to discuss (not added):
+1. **Cleanup**: the fixture stays in the bucket, and with versioning on, each run adds a version. The app user can't delete versions, because the policy has no `s3:DeleteObjectVersion`.
+2. **Persistence test**: destroy/recreate containers and check the data survives (nice-to-have).
+3. **CI workflow**: the script is CI-ready, but no GitHub Actions file was written.
+
+Graph updated: added an ephemeral `tests/run.sh` node with dashed edges to MinIO and PostgreSQL, plus a Testing section in the README.
+
+</details>
+
+<details>
+<summary><strong>#11</strong> — thanks. about cleanup, it is fine. the tests are just for demo purposes and this is definitely not production stuff. about 2 and 3, i'll do everything later.</summary>
+
+No changes. The fixture and its old versions stay in `data-bucket`. The persistence test and CI workflow are left for later.
+
+No graph change needed.
+
+</details>

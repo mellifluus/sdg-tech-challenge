@@ -1,7 +1,8 @@
 output "networks" {
   description = "Docker networks created by the stack."
   value = {
-    data = docker_network.data.name
+    data       = local.foundation.networks.data
+    monitoring = local.foundation.networks.monitoring
   }
 }
 
@@ -11,7 +12,7 @@ output "minio" {
     api_url           = module.minio.api_url
     console_url       = module.minio.console_url
     internal_endpoint = module.minio.internal_endpoint
-    root_user         = var.minio_root_user
+    root_user         = local.foundation.minio_root_user
     app_user          = var.minio_app_user
     buckets           = module.minio.buckets
   }
@@ -19,13 +20,13 @@ output "minio" {
 
 output "minio_root_password" {
   description = "MinIO root password (terraform output -raw minio_root_password)."
-  value       = local.minio_root_password
+  value       = local.foundation.minio_root_password
   sensitive   = true
 }
 
 output "minio_app_password" {
   description = "Secret key of the least-privilege pipeline user."
-  value       = random_password.minio_app.result
+  value       = local.foundation.minio_app_password
   sensitive   = true
 }
 
@@ -45,11 +46,16 @@ output "postgres" {
 output "postgres_passwords" {
   description = "Generated PostgreSQL passwords (terraform output -json postgres_passwords)."
   value = {
-    postgres                   = random_password.postgres["superuser"].result
-    (var.orchestrator_db_name) = random_password.postgres["orchestrator"].result
-    (var.warehouse_db_name)    = random_password.postgres["warehouse"].result
+    postgres                   = local.foundation.postgres_passwords.superuser
+    (var.orchestrator_db_name) = local.foundation.postgres_passwords.orchestrator
+    (var.warehouse_db_name)    = local.foundation.postgres_passwords.warehouse
   }
   sensitive = true
+}
+
+output "volumes" {
+  description = "Persistent volumes (owned by the foundation layer)."
+  value       = local.foundation.volumes
 }
 
 output "mc_image" {

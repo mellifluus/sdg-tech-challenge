@@ -44,3 +44,8 @@ variable "labels" {
   type        = map(string)
   default     = {}
 }
+
+variable "volume_name" {
+  description = "Pre-existing Docker volume for the data dir (owned by the foundation layer)."
+  type        = string
+}

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TF_DIR="${TF_DIR:-$ROOT_DIR/terraform}"
+TF_DIR="${TF_DIR:-$ROOT_DIR/terraform/platform}"
 FIXTURE="$ROOT_DIR/tests/fixtures/orders.csv"
 FIXTURE_KEY="fixtures/orders.csv"
 E2E_TABLE="e2e_orders"

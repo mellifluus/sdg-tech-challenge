@@ -16,5 +16,5 @@ output "databases" {
 }
 
 output "volume_name" {
-  value = docker_volume.data.name
+  value = var.volume_name
 }

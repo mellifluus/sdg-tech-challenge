@@ -4,16 +4,10 @@ variable "docker_host" {
   default     = null
 }
 
-variable "project_name" {
-  description = "Prefix used for every Docker object."
+variable "foundation_state_path" {
+  description = "Path to the foundation layer state (local backend)."
   type        = string
-  default     = "sdg"
-
-  # https://github.com/moby/moby/blob/master/daemon/names/names.go
-  validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{2,20}$", var.project_name))
-    error_message = "project_name must be lowercase alphanumeric (dashes allowed)."
-  }
+  default     = "../foundation/terraform.tfstate"
 }
 
 variable "bind_address" {
@@ -31,19 +25,6 @@ variable "minio_image" {
   EOT
   type        = string
   default     = "cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8"
-}
-
-variable "minio_root_user" {
-  description = "MinIO root user."
-  type        = string
-  default     = "minioadmin"
-}
-
-variable "minio_root_password" {
-  description = "MinIO root password. Leave null to generate a random one (see `terraform output`)."
-  type        = string
-  default     = null
-  sensitive   = true
 }
 
 variable "minio_api_port" {

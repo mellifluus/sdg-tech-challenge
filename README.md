@@ -8,17 +8,17 @@ Local data platform built with **Terraform + Docker**: MinIO object storage and 
 flowchart TB
     subgraph docker["Docker"]
         direction LR
-        subgraph sdg-data["sdg-data network"]
+        subgraph sdg-data["sdg-data network (foundation)"]
             minio["minio<br/>(MinIO server)"]
             bootstrap["minio-bootstrap<br/>(one-shot mc job)"]
             postgres["postgres<br/>(PostgreSQL server)"]
             pg_bootstrap["postgres-bootstrap<br/>(one-shot psql job)"]
             tests["tests/run.sh<br/>(ephemeral mc / psql containers)"]
         end
-        subgraph sdg-monitoring["sdg-monitoring network"]
+        subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
         end
-        minio_vol[("sdg-minio-data<br/>volume")]
-        pg_vol[("sdg-postgres-data<br/>volume")]
+        minio_vol[("sdg-minio-data<br/>volume (foundation)")]
+        pg_vol[("sdg-postgres-data<br/>volume (foundation)")]
     end
     host(["Host"])
 
@@ -31,6 +31,11 @@ flowchart TB
     tests -. "checks, fixture upload" .-> minio
     tests -. "checks, e2e load" .-> postgres
 ```
+
+Two Terraform root modules with separate states: `terraform/foundation` (networks, volumes,
+credentials) and `terraform/platform` (images, containers, bootstrap jobs), which reads the
+foundation outputs through `terraform_remote_state`. `make up` applies both, `make down` destroys
+only the platform so data survives, and `make nuke` destroys both.
 
 ## Testing
 

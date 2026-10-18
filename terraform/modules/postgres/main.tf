@@ -3,18 +3,6 @@ resource "docker_image" "postgres" {
   keep_locally = true
 }
 
-resource "docker_volume" "data" {
-  name = "${var.name_prefix}-postgres-data"
-
-  dynamic "labels" {
-    for_each = var.labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
-  }
-}
-
 resource "docker_container" "postgres" {
   name     = "${var.name_prefix}-postgres"
   image    = docker_image.postgres.image_id
@@ -40,7 +28,7 @@ resource "docker_container" "postgres" {
   }
 
   volumes {
-    volume_name    = docker_volume.data.name
+    volume_name    = var.volume_name
     container_path = "/var/lib/postgresql/data"
   }
 

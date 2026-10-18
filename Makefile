@@ -4,10 +4,15 @@ SHELL         := /bin/bash
 MAKEFLAGS     += --no-print-directory
 
 TF_DIR := terraform
-TF     := terraform -chdir=$(TF_DIR)
 ARGS   ?=
 
-.PHONY: help init validate plan apply up destroy down output credentials test fmt fmt-check lint pre-commit clean
+# Two root modules with separate states. foundation (networks, volumes, credentials) outlives
+# platform (images, containers, bootstrap jobs), which reads it through terraform_remote_state.
+LAYERS         := foundation platform
+TF_FOUNDATION  := terraform -chdir=$(TF_DIR)/foundation
+TF_PLATFORM    := terraform -chdir=$(TF_DIR)/platform
+
+.PHONY: help init validate plan apply up destroy down nuke output credentials test fmt fmt-check lint pre-commit clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m [ARGS=\"...\"]\n\n"} \
@@ -15,32 +20,39 @@ help: ## Show this help
 
 ## Terraform lifecycle
 
-init: ## terraform init
-	$(TF) init $(ARGS)
+# ARGS is passed to every layer, so set variables with TF_VAR_<name> (ignored by the layer that
+# does not declare it) rather than -var.
 
-validate: init ## terraform validate
-	$(TF) validate
+init: ## terraform init (both layers)
+	@for l in $(LAYERS); do terraform -chdir=$(TF_DIR)/$$l init $(ARGS); done
 
-plan: init ## terraform plan
-	$(TF) plan $(ARGS)
+validate: init ## terraform validate (both layers)
+	@for l in $(LAYERS); do terraform -chdir=$(TF_DIR)/$$l validate; done
 
-apply: init ## terraform apply (pass ARGS=-auto-approve to skip the prompt)
-	$(TF) apply $(ARGS)
+plan: init ## terraform plan (both layers; platform needs foundation applied first)
+	@for l in $(LAYERS); do terraform -chdir=$(TF_DIR)/$$l plan $(ARGS); done
+
+apply: init ## terraform apply, foundation then platform (ARGS=-auto-approve to skip prompts)
+	@for l in $(LAYERS); do terraform -chdir=$(TF_DIR)/$$l apply $(ARGS); done
 
 up: init ## Deploy the whole stack without prompting
-	$(TF) apply -auto-approve $(ARGS)
+	$(TF_FOUNDATION) apply -auto-approve $(ARGS)
+	$(TF_PLATFORM) apply -auto-approve $(ARGS)
 
-destroy: ## terraform destroy
-	$(TF) destroy $(ARGS)
+destroy: ## terraform destroy of the platform layer only (data is kept)
+	$(TF_PLATFORM) destroy $(ARGS)
 
-down: ## Tear down the whole stack without prompting
-	$(TF) destroy -auto-approve $(ARGS)
+down: ## Tear down containers without prompting (volumes, networks, credentials are kept)
+	$(TF_PLATFORM) destroy -auto-approve $(ARGS)
 
-output: ## terraform output (non-sensitive)
-	$(TF) output $(ARGS)
+nuke: down ## Tear down everything, data included, without prompting
+	$(TF_FOUNDATION) destroy -auto-approve $(ARGS)
+
+output: ## terraform output of the platform layer (non-sensitive)
+	$(TF_PLATFORM) output $(ARGS)
 
 credentials: ## Print endpoints and credentials needed to test the stack
-	@out=$$($(TF) output -json); \
+	@out=$$($(TF_PLATFORM) output -json); \
 	if [ "$$out" = "{}" ]; then echo "No outputs in state — run 'make up' first." >&2; exit 1; fi; \
 	jq -r ' \
 		"MinIO", \
@@ -63,10 +75,10 @@ test: ## Run the integration tests against the deployed stack
 ## Code quality
 
 fmt: ## Format all Terraform files
-	$(TF) fmt -recursive
+	terraform -chdir=$(TF_DIR) fmt -recursive
 
 fmt-check: ## Check Terraform formatting (CI-friendly)
-	$(TF) fmt -recursive -check -diff
+	terraform -chdir=$(TF_DIR) fmt -recursive -check -diff
 
 lint: fmt-check validate ## fmt check + validate + tflint
 	tflint --chdir=$(TF_DIR) --config=$(CURDIR)/.tflint.hcl --init

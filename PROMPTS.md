@@ -286,3 +286,48 @@ No changes. The fixture and its old versions stay in `data-bucket`. The persiste
 No graph change needed.
 
 </details>
+
+<details>
+<summary><strong>#12</strong> — i'm now at the point where i want to implement some sort of mechanism to persist the storage layer ( probably also networks and credentials ). currently you either apply everything or destroy everything. i was thinking of putting the volumes on a separate state; but the challenge says everything should be up with one command and i'm interpreting it as a single terraform apply. my second option is a variable, passed on apply. something like services_enabled, that when false basically tears everything down except for volumes networks and credentials. wdyt? is there any other option/advice you can give me?</summary>
+
+Advice only, no code changes.
+
+**First, check what the requirement actually asks.** The nice-to-have says data survives *container* destroy/recreate. Named volumes already do that: `terraform apply -replace=module.postgres.docker_container.postgres` or an image bump keeps the data. You may only need a test for it. Surviving a full `terraform destroy` goes beyond the requirement.
+
+**If you want more than that, here are the options:**
+
+1. **Separate state (recommended).** Split into two roots: `foundation/` holds the networks, volumes and `random_password`s; `platform/` holds the images, containers and bootstrap jobs. `platform/` reads `foundation/` through `terraform_remote_state` (local backend) or `docker_*` data sources by name. "Single command" means `make up` (apply foundation, then platform), not a single `terraform apply`. Reviewers will accept a Makefile/CI entrypoint. Then `make down` destroys only `platform/`, and `make nuke` destroys both in reverse order. This is the standard layered-state pattern (stateful and stateless resources have different lifecycles). It also makes a good point to write up in the README.
+2. **`services_enabled` variable with `count` on the modules.** It works, but there are problems. A plain `terraform destroy` still deletes everything, so the protection only holds if people remember the flag. "Destroy by apply" is unusual. And `count` changes every resource address (`module.x[0]`), which needs `moved` blocks.
+3. **`lifecycle { prevent_destroy = true }` on volumes.** It doesn't keep the data in place. It makes `terraform destroy` fail with an error, so it's a safety net, not a mechanism.
+4. **Host bind mounts** (`docker_volume` with `driver_opts = { type = "none", o = "bind", device = abspath(...) }`). This keeps a single state, and the files outlive the volume object. But Terraform no longer fully owns the data, and you need `.gitignore` entries and host-path permissions.
+
+**Gotcha whatever you choose: credentials must persist together with the data.** If `random_password` is regenerated while the PG volume survives, `POSTGRES_PASSWORD` is ignored, because the data dir is already initialized. The new superuser password won't work, and the bootstrap job breaks. MinIO is similar: changing root creds over existing IAM data can cause trouble. Options 1 and 2 handle this if the passwords stay in the persistent layer. Option 4 doesn't.
+
+No graph change needed.
+
+</details>
+
+<details>
+<summary><strong>#13</strong> — decided to go with option 1. it worked pretty well i think. please update my Makefile and then review my work, first time using terraform_remote_state</summary>
+
+**Makefile**: added `LAYERS := foundation platform` and the variables `TF_FOUNDATION` / `TF_PLATFORM`.
+- `init` / `validate` / `plan` / `apply` loop over both layers in order.
+- `up` applies foundation, then platform.
+- `destroy` / `down` destroy only the platform layer, so data is kept.
+- New `nuke` target runs `down` first and then destroys foundation.
+- `output` / `credentials` read from platform. `fmt` / `lint` / `clean` still work recursively on `terraform/`.
+- `ARGS` goes to both layers, so set variables with `TF_VAR_*` instead of `-var`.
+
+**Verified**: `make lint` is clean. Ran `make up` → `make test` (16/16) → `make down` (both volumes kept) → `make up` → `make test` (16/16). Both bootstraps re-run cleanly against the persisted data. With no foundation state, platform fails with a clear "Unable to find remote state" error.
+
+**Review**: the split is clean. Credentials sit in foundation together with the data, remote-state outputs keep `sensitive`, `project_name` has one source, and the relative state path works with `-chdir`. Smaller points:
+1. Platform refers to volumes by **name only**. If a volume is missing, Docker silently creates an empty, unlabelled one. `make up` covers this because foundation is applied first and recreates any drifted volume, but a direct `terraform apply` in `platform/` does not.
+2. The modules' `volume_name` outputs now only echo their input. They are dead and can be removed.
+3. `terraform/foundation/.terraform.lock.hcl` is untracked. Commit it.
+4. Rotating a foundation password (e.g. tainting `random_password.postgres["superuser"]`) breaks the bootstrap while the volume survives.
+5. `make plan` on a fresh clone fails at platform until foundation is applied. Every layered-state setup has this; at most, worth a line in the README.
+6. If you move to a remote backend later, only `data.terraform_remote_state.foundation` needs to change. Both states contain secrets.
+
+Graph updated: networks and volumes are labelled `(foundation)`, and a short paragraph on the two layers was added under the graph.
+
+</details>

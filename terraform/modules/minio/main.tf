@@ -3,18 +3,6 @@ resource "docker_image" "minio" {
   keep_locally = true
 }
 
-resource "docker_volume" "data" {
-  name = "${var.name_prefix}-minio-data"
-
-  dynamic "labels" {
-    for_each = var.labels
-    content {
-      label = labels.key
-      value = labels.value
-    }
-  }
-}
-
 resource "docker_container" "minio" {
   name     = "${var.name_prefix}-minio"
   image    = docker_image.minio.image_id
@@ -41,7 +29,7 @@ resource "docker_container" "minio" {
   }
 
   volumes {
-    volume_name    = docker_volume.data.name
+    volume_name    = var.volume_name
     container_path = "/data"
   }
 

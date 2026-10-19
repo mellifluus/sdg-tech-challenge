@@ -26,6 +26,35 @@ solution is presented — completeness is not mandatory, but structure and reaso
 - [ ] Platform monitoring.
 - [ ] Data persistence: DB data and files survive container destroy/recreate.
 
+### Orchestrator (optional extension)
+
+SDG removed the orchestrator from the challenge to keep it simple, but confirmed it can be added.
+The plan is **Apache Airflow**:
+
+- [ ] Airflow (webserver/api-server, scheduler, `LocalExecutor`) deployed by Terraform in
+      `terraform/platform`, same single-command `make up`.
+- [ ] Metadata stored in the existing `airflow` PostgreSQL database; DAG output written to the
+      `warehouse` database.
+- [ ] Airflow connections to MinIO (S3, app user) and `warehouse` injected via env vars from
+      Terraform — no credentials in DAG code.
+- [ ] DAGs mounted from a repo folder (`dags/`), Airflow logs persisted on a volume.
+- [ ] UI reachable from the host; Airflow metrics scraped by Prometheus (StatsD exporter) and
+      a basic Grafana panel/alert for failed DAG runs.
+- [ ] Tests: DAGs import without errors, and an end-to-end DAG run succeeds in `make test`.
+
+Example DAGs (a consulting company running data/analytics/AI pipelines for clients):
+
+1. **`ingest_orders`** — waits for new CSVs in `data-bucket/raw/orders/`, validates the schema,
+   loads them into `warehouse.staging.orders` (idempotent upsert on `order_id`), then moves the
+   file to `processed/` (or `rejected/` on failure).
+2. **`sales_kpis_daily`** — triggered by `ingest_orders` (Airflow Dataset); builds mart tables
+   (daily revenue, revenue per customer/product) for client BI dashboards.
+3. **`data_quality_checks`** — row counts, nulls, duplicates and freshness on staging/mart
+   tables; fails (and alerts) when a check is violated.
+4. **`ml_feature_export`** — weekly; computes customer features (recency, frequency, monetary
+   value) from the warehouse and writes a dated Parquet snapshot to `data-bucket/features/`
+   for model training.
+
 ## AI usage rule (mandatory)
 
 AI use is allowed but must be documented. **After every prompt in this project, append an entry
@@ -39,4 +68,5 @@ more like an assistant than an agentic developer. Override this default behaviou
 
 `README.md` holds a Mermaid graph of the stack. **On every prompt, check whether the changes
 (containers, networks, volumes, ports, connections) require updating the graph**, and update it
-if so.
+if so. The graph shows **only the deployed architecture**: no test scripts, CI jobs or other
+tooling.

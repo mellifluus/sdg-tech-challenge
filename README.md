@@ -13,7 +13,6 @@ flowchart TB
             bootstrap["minio-bootstrap<br/>(one-shot mc job)"]
             postgres["postgres<br/>(PostgreSQL server)"]
             pg_bootstrap["postgres-bootstrap<br/>(one-shot psql job)"]
-            tests["tests/run.sh, persistence.sh<br/>(ephemeral mc / psql containers)"]
         end
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
             prometheus["prometheus<br/>(metrics, monitoring network only)"]
@@ -33,8 +32,6 @@ flowchart TB
     host -- ":5432" --> postgres
     pg_bootstrap -- "roles, databases, grants" --> postgres
     postgres --- pg_vol
-    tests -. "checks, fixture upload" .-> minio
-    tests -. "checks, e2e load" .-> postgres
     host -- ":9090 UI / API" --> prometheus
     prometheus --- prom_vol
     prometheus -- "scrape /minio/v2/metrics" --> minio

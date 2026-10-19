@@ -27,7 +27,7 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 20 | Missing Grafana home dashboard |
 | 21 | Grafana tests & graph |
 | 22 | Persistence test & CI pipeline |
-| 23 | ShellCheck unused warnings in lib.sh |
+| 23 | Airflow requirements & graph rule |
 
 ---
 
@@ -633,5 +633,21 @@ Ran it against the live stack: 26 passed, 0 failed. Updated the README graph wit
   It restarts the stack, so `make test` doesn't run it. Local run: 17 passed, 0 failed (`make test` is still 26 passed).
 
 - **README**: added the Testing section. In the graph, the tests node is relabelled to include `persistence.sh`.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#23 · Airflow requirements & graph rule</strong></summary>
+
+> **Prompt**
+>
+> just received an answer to my email about the orchestrator, or if I needed to add one to the stack. the answer was yes, that they removed it from the challenge to simplify it, but to feel free to add it. i'll spend some time to study Airflow and how DAGs work. for now, please add the requirements to CLAUDE.md. you can maybe "invent" some DAG that would make sense in a data, analytics, AI consulting company. also please, add a rule in CLAUDE.md stating that the diagram in README.md should only entail the actual architecture, no tests
+
+**Answer**
+
+- **CLAUDE.md**: added an "Orchestrator (optional extension)" section with the Airflow requirements: Terraform-managed, `LocalExecutor`, metadata in the existing `airflow` DB, output to `warehouse`, MinIO and PostgreSQL connections injected from Terraform, `dags/` mount, a logs volume, Prometheus/Grafana monitoring, and tests. It also lists four example DAGs: `ingest_orders` (MinIO → staging), `sales_kpis_daily` (marts), `data_quality_checks`, and `ml_feature_export` (RFM features as Parquet in MinIO).
+- **Graph rule**: the graph must show only the deployed architecture (no tests, CI or tooling). Applied it right away by removing the tests node and its two edges from the README graph.
 
 </details>

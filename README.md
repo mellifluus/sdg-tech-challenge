@@ -9,16 +9,19 @@ flowchart TB
     subgraph docker["Docker"]
         direction LR
         subgraph sdg-data["sdg-data network (foundation)"]
-            minio["minio<br/>(MinIO server)"]
+            minio["minio<br/>(MinIO server, also on sdg-monitoring)"]
             bootstrap["minio-bootstrap<br/>(one-shot mc job)"]
             postgres["postgres<br/>(PostgreSQL server)"]
             pg_bootstrap["postgres-bootstrap<br/>(one-shot psql job)"]
             tests["tests/run.sh<br/>(ephemeral mc / psql containers)"]
         end
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
+            prometheus["prometheus<br/>(metrics, monitoring network only)"]
+            pg_exporter["postgres-exporter<br/>(also on sdg-data)"]
         end
         minio_vol[("sdg-minio-data<br/>volume (foundation)")]
         pg_vol[("sdg-postgres-data<br/>volume (foundation)")]
+        prom_vol[("sdg-prometheus-data<br/>volume (foundation)")]
     end
     host(["Host"])
 
@@ -30,6 +33,11 @@ flowchart TB
     postgres --- pg_vol
     tests -. "checks, fixture upload" .-> minio
     tests -. "checks, e2e load" .-> postgres
+    host -- ":9090 UI / API" --> prometheus
+    prometheus --- prom_vol
+    prometheus -- "scrape /minio/v2/metrics" --> minio
+    prometheus -- "scrape :9187" --> pg_exporter
+    pg_exporter -- "pg_monitor role" --> postgres
 ```
 
 Two Terraform root modules with separate states: `terraform/foundation` (networks, volumes,
@@ -49,5 +57,8 @@ checks, so it can run as-is in CI.
   app user is denied bucket creation and admin operations.
 - **PostgreSQL**: the server is ready, and each role can connect to its own database and is
   denied the other one.
+- **Prometheus**: ready, all scrape targets `up`, `pg_up == 1`, MinIO reports online nodes
+  (polled for ~60s so the first scrape can land), and a container on `sdg-monitoring` cannot
+  reach PostgreSQL directly.
 - **E2E**: streams the fixture out of the bucket into `warehouse.e2e_orders` (truncate + load
   in one transaction) and checks the row count and total.

@@ -1,14 +1,38 @@
 # AI Prompts Log
 
 Every prompt given to the AI assistant (Claude Code, model Claude Opus 5.5) during this
-challenge, in chronological order. Expand each entry to see the answer.
+challenge, in chronological order. Expand each entry to see the prompt and the answer.
+
+| # | Topic |
+|---|-------|
+| 1 | Repo bootstrap & AI-usage rules |
+| 2 | Common Docker labels |
+| 3 | README architecture graph |
+| 4 | Terraform heredoc syntax |
+| 5 | Creating the bucket in one command |
+| 6 | MinIO bootstrap review |
+| 7 | MinIO bootstrap follow-up |
+| 8 | PostgreSQL bootstrap & REVOKE/GRANT |
+| 9 | Root Makefile |
+| 10 | Integration test script |
+| 11 | Test follow-up |
+| 12 | Storage persistence options |
+| 13 | Layered state review |
+| 14 | Prometheus tests & suggestions |
+| 15 | Monitoring network isolation plan |
+| 16 | Isolation review & graph update |
+| 17 | PROMPTS.md readability |
 
 ---
 
 <details>
-<summary><strong>#1</strong> — Bootstrap a git repo called sdg-tech-challenge for this tech challenge: "/Users/massi/Downloads/_SDG Data Infrastructure - Prova Tecnica Engineer - Semplificata.pdf". Point remote to the same repo name, by "mellifluus". Pin the latest stable Terraform version in a .terraform-version file for tfenv users. Create a CLAUDE.md file concisely explaining the challenge and acceptance criterias. AI use is allowed, but needs to be documented. Create a PROMPTS.md file which shows all prompts made in this project ( including this one ) as expandable dropdowns that show your answers. Also set this rule in CLAUDE.md.</summary>
+<summary><strong>#1 · Repo bootstrap & AI-usage rules</strong></summary>
 
-<br>
+> **Prompt**
+>
+> Bootstrap a git repo called sdg-tech-challenge for this tech challenge: "/Users/massi/Downloads/_SDG Data Infrastructure - Prova Tecnica Engineer - Semplificata.pdf". Point remote to the same repo name, by "mellifluus". Pin the latest stable Terraform version in a .terraform-version file for tfenv users. Create a CLAUDE.md file concisely explaining the challenge and acceptance criterias. AI use is allowed, but needs to be documented. Create a PROMPTS.md file which shows all prompts made in this project ( including this one ) as expandable dropdowns that show your answers. Also set this rule in CLAUDE.md.
+
+**Answer**
 
 Read the challenge PDF (Italian), then:
 
@@ -30,10 +54,16 @@ be created on GitHub (the `gh` CLI isn't installed) before the first push.
 
 </details>
 
-<details>
-<summary><strong>#2</strong> — Does it make sense to set up common labels on each thing this repo spawns in Docker as a fallback for corrupted state or for maybe automate testing later? Answer concisely, no hard examples.</summary>
+---
 
-<br>
+<details>
+<summary><strong>#2 · Common Docker labels</strong></summary>
+
+> **Prompt**
+>
+> Does it make sense to set up common labels on each thing this repo spawns in Docker as a fallback for corrupted state or for maybe automate testing later? Answer concisely, no hard examples.
+
+**Answer**
 
 Yes, it's worth doing. It costs little and pays off in a few ways:
 
@@ -61,10 +91,16 @@ Things to watch out for:
 
 </details>
 
-<details>
-<summary><strong>#3</strong> — can you please, on a new README.md file, mantain a mermaid graph of the stack while I work? for now you can just draw a big bounding box representing Docker, and two other bounding boxes inside, representing the sdg-data and sdg-monitoring "networks". add a rule to CLAUDE.md to also check if the graph needs updating on each prompt.</summary>
+---
 
-<br>
+<details>
+<summary><strong>#3 · README architecture graph</strong></summary>
+
+> **Prompt**
+>
+> can you please, on a new README.md file, mantain a mermaid graph of the stack while I work? for now you can just draw a big bounding box representing Docker, and two other bounding boxes inside, representing the sdg-data and sdg-monitoring "networks". add a rule to CLAUDE.md to also check if the graph needs updating on each prompt.
+
+**Answer**
 
 - Created `README.md` with a Mermaid `flowchart`: an outer `Docker` subgraph containing two
   (still empty) subgraphs, `sdg-data network` and `sdg-monitoring network`.
@@ -74,10 +110,16 @@ Things to watch out for:
 
 </details>
 
-<details>
-<summary><strong>#4</strong> — please remind me of the multiline string syntax in terraform. like the classic UNIX one</summary>
+---
 
-<br>
+<details>
+<summary><strong>#4 · Terraform heredoc syntax</strong></summary>
+
+> **Prompt**
+>
+> please remind me of the multiline string syntax in terraform. like the classic UNIX one
+
+**Answer**
 
 Terraform uses heredoc syntax:
 
@@ -93,10 +135,16 @@ indented with the surrounding code. `${...}` interpolation works inside both for
 
 </details>
 
-<details>
-<summary><strong>#5</strong> — so the challenge states everything needs to be provisioned in one command. that basically means that using the minio provider to create the required data bucket is out of the question. is there any way to run a startup job or similar that fails the terraform apply if it doesn't succeed? if so, what should i search for? if not, any advice?</summary>
+---
 
-<br>
+<details>
+<summary><strong>#5 · Creating the bucket in one command</strong></summary>
+
+> **Prompt**
+>
+> so the challenge states everything needs to be provisioned in one command. that basically means that using the minio provider to create the required data bucket is out of the question. is there any way to run a startup job or similar that fails the terraform apply if it doesn't succeed? if so, what should i search for? if not, any advice?
+
+**Answer**
 
 The minio provider is not ruled out. Terraform can configure a provider from resources in the
 same config. The problem here is `random_password`: the minio provider's password is unknown at
@@ -121,10 +169,16 @@ To re-run the job on rebuilds, add `replace_triggered_by` pointing at the MinIO 
 
 </details>
 
-<details>
-<summary><strong>#6</strong> — finally managed to make the bootstrap job for minio work. is there anything worth adding there?</summary>
+---
 
-<br>
+<details>
+<summary><strong>#6 · MinIO bootstrap review</strong></summary>
+
+> **Prompt**
+>
+> finally managed to make the bootstrap job for minio work. is there anything worth adding there?
+
+**Answer**
 
 Reviewed `modules/minio/bootstrap.tf` and `bootstrap.sh.tftpl`. The design is solid. Suggestions,
 most important first:
@@ -156,10 +210,16 @@ Also updated the README Mermaid graph: MinIO container, data volume, bootstrap j
 
 </details>
 
-<details>
-<summary><strong>#7</strong> — addressing feedback. 1. tried running terraform apply -replace=module.minio.docker_container.minio after a full apply but everything succeded. are you saying it will break when i add storage persistence? 2. the image doesn't ship with timeout. added a timeout to the bootstrap resource in terraform. should work the same, right? 3. i don't understand your feedback. 4. i plan to add smoke tests later, no need 5. that's alright for this challenge. also added versioning with a variable, looks good?</summary>
+---
 
-<br>
+<details>
+<summary><strong>#7 · MinIO bootstrap follow-up</strong></summary>
+
+> **Prompt**
+>
+> addressing feedback. 1. tried running terraform apply -replace=module.minio.docker_container.minio after a full apply but everything succeded. are you saying it will break when i add storage persistence? 2. the image doesn't ship with timeout. added a timeout to the bootstrap resource in terraform. should work the same, right? 3. i don't understand your feedback. 4. i plan to add smoke tests later, no need 5. that's alright for this challenge. also added versioning with a variable, looks good?
+
+**Answer**
 
 1. **The earlier claim was wrong.** Persistence already works: `sdg-minio-data` is a named
    volume and survives the replace. Re-ran the existing job with `docker start -a
@@ -195,8 +255,16 @@ No graph change needed.
 
 </details>
 
+---
+
 <details>
-<summary><strong>#8</strong> — i went for a bootstrap job for postgresql too. it had the same issue as minio - first plan would fail. i added two lines at the end of the for database loop, that I found in an old project where I was studying database hardening. I'm not sure what they do, would be great if you explained and told me if they make sense here</summary>
+<summary><strong>#8 · PostgreSQL bootstrap & REVOKE/GRANT</strong></summary>
+
+> **Prompt**
+>
+> i went for a bootstrap job for postgresql too. it had the same issue as minio - first plan would fail. i added two lines at the end of the for database loop, that I found in an old project where I was studying database hardening. I'm not sure what they do, would be great if you explained and told me if they make sense here
+
+**Answer**
 
 **`REVOKE ALL ON DATABASE "x" FROM PUBLIC;`**
 `PUBLIC` means every role, including roles created later. When Postgres creates a database, it
@@ -221,8 +289,16 @@ volume and host port 5432.
 
 </details>
 
+---
+
 <details>
-<summary><strong>#9</strong> — can you create a makefile at the root of the project? it should have all the classics like .PHONY, help etc and make it easier for me to just run terraform commands from the root of the project. also lint, fmt, and possibly a make credentials command that prints out all the credentials that i need to test this</summary>
+<summary><strong>#9 · Root Makefile</strong></summary>
+
+> **Prompt**
+>
+> can you create a makefile at the root of the project? it should have all the classics like .PHONY, help etc and make it easier for me to just run terraform commands from the root of the project. also lint, fmt, and possibly a make credentials command that prints out all the credentials that i need to test this
+
+**Answer**
 
 Added a root `Makefile` that runs Terraform with `terraform -chdir=terraform`, so you can run every
 command from the repository root. Running `make` with no target prints the help.
@@ -244,13 +320,21 @@ No graph change needed.
 
 </details>
 
-<details>
-<summary><strong>#10</strong> — i wanna add some sort of automated testing that could also run on a ci/cd environment. i was thinking of a shell script, that uses the mc client image and the postgres image to test everything works. i added them to the tf outputs. we should test the following:
-MinIO: api and web console healthcheck, check data-bucket exists and versioning is on, make app user upload some fixture to the data-bucket ( you just add some sample data to the repo ) and check the data is in the bucket afterwards. finally, check app user privileges like creating other buckets.
-PostgreSQL: healthcheck, check connection with each user of each database and check connections of each user to the other database.
-e2e: create a new table in the warehouse database, if it doesn't exist. stream the fixture out of the bucket, put the data in the table, finally check it exists.
+---
 
-i think im covering everything. everything is up currently, so you can probably test while you go. if im missing something, ask before adding and let's discuss about it</summary>
+<details>
+<summary><strong>#10 · Integration test script</strong></summary>
+
+> **Prompt**
+>
+> i wanna add some sort of automated testing that could also run on a ci/cd environment. i was thinking of a shell script, that uses the mc client image and the postgres image to test everything works. i added them to the tf outputs. we should test the following:<br>
+> MinIO: api and web console healthcheck, check data-bucket exists and versioning is on, make app user upload some fixture to the data-bucket ( you just add some sample data to the repo ) and check the data is in the bucket afterwards. finally, check app user privileges like creating other buckets.<br>
+> PostgreSQL: healthcheck, check connection with each user of each database and check connections of each user to the other database.<br>
+> e2e: create a new table in the warehouse database, if it doesn't exist. stream the fixture out of the bucket, put the data in the table, finally check it exists.<br>
+>
+> i think im covering everything. everything is up currently, so you can probably test while you go. if im missing something, ask before adding and let's discuss about it
+
+**Answer**
 
 Added `tests/run.sh`, `tests/fixtures/orders.csv` (10 orders) and a `make test` target. Ran it against the live stack: **16 passed, 0 failed**. A second run also passed, so the script is idempotent.
 
@@ -278,8 +362,16 @@ Graph updated: added an ephemeral `tests/run.sh` node with dashed edges to MinIO
 
 </details>
 
+---
+
 <details>
-<summary><strong>#11</strong> — thanks. about cleanup, it is fine. the tests are just for demo purposes and this is definitely not production stuff. about 2 and 3, i'll do everything later.</summary>
+<summary><strong>#11 · Test follow-up</strong></summary>
+
+> **Prompt**
+>
+> thanks. about cleanup, it is fine. the tests are just for demo purposes and this is definitely not production stuff. about 2 and 3, i'll do everything later.
+
+**Answer**
 
 No changes. The fixture and its old versions stay in `data-bucket`. The persistence test and CI workflow are left for later.
 
@@ -287,8 +379,16 @@ No graph change needed.
 
 </details>
 
+---
+
 <details>
-<summary><strong>#12</strong> — i'm now at the point where i want to implement some sort of mechanism to persist the storage layer ( probably also networks and credentials ). currently you either apply everything or destroy everything. i was thinking of putting the volumes on a separate state; but the challenge says everything should be up with one command and i'm interpreting it as a single terraform apply. my second option is a variable, passed on apply. something like services_enabled, that when false basically tears everything down except for volumes networks and credentials. wdyt? is there any other option/advice you can give me?</summary>
+<summary><strong>#12 · Storage persistence options</strong></summary>
+
+> **Prompt**
+>
+> i'm now at the point where i want to implement some sort of mechanism to persist the storage layer ( probably also networks and credentials ). currently you either apply everything or destroy everything. i was thinking of putting the volumes on a separate state; but the challenge says everything should be up with one command and i'm interpreting it as a single terraform apply. my second option is a variable, passed on apply. something like services_enabled, that when false basically tears everything down except for volumes networks and credentials. wdyt? is there any other option/advice you can give me?
+
+**Answer**
 
 Advice only, no code changes.
 
@@ -307,8 +407,16 @@ No graph change needed.
 
 </details>
 
+---
+
 <details>
-<summary><strong>#13</strong> — decided to go with option 1. it worked pretty well i think. please update my Makefile and then review my work, first time using terraform_remote_state</summary>
+<summary><strong>#13 · Layered state review</strong></summary>
+
+> **Prompt**
+>
+> decided to go with option 1. it worked pretty well i think. please update my Makefile and then review my work, first time using terraform_remote_state
+
+**Answer**
 
 **Makefile**: added `LAYERS := foundation platform` and the variables `TF_FOUNDATION` / `TF_PLATFORM`.
 - `init` / `validate` / `plan` / `apply` loop over both layers in order.
@@ -331,3 +439,115 @@ No graph change needed.
 Graph updated: networks and volumes are labelled `(foundation)`, and a short paragraph on the two layers was added under the graph.
 
 </details>
+
+---
+
+<details>
+<summary><strong>#14 · Prometheus tests & suggestions</strong></summary>
+
+> **Prompt**
+>
+> added prometheus which scrapes from minio and pg-exporter. anything you would add? maybe add a couple test for prometheus healthcheck?
+
+**Answer**
+
+**Tests** (added to `tests/run.sh`; `make test` now passes 20/20 against the running stack):
+- Prometheus `/-/ready` responds.
+- Every active scrape target is `up`, checked through `/api/v1/targets`.
+- `pg_up == 1`. The exporter's target can be up while the exporter is failing to reach the DB, so this checks the database connection itself.
+- `minio_cluster_nodes_online_total == 1`.
+- A `poll_eq` helper retries for about 60s, so a fresh `make up` doesn't fail while the first scrape is still pending.
+
+**Suggestions**, most valuable first:
+1. **Network isolation**: Prometheus is attached to `sdg-data`, which leaves `sdg-monitoring` mostly unused. Attach MinIO to `sdg-monitoring` instead (Prometheus only needs `:9000`) and keep Prometheus on `sdg-monitoring` only. The exporter is the only thing that needs both networks.
+2. **Alert rules**: upload a `rules.yml` with `up == 0`, `pg_up == 0`, MinIO offline nodes / low free disk, and PG connections close to `max_connections`. A test can then check `/api/v1/rules`. Rules without Alertmanager still show up in the UI and make the setup look finished.
+3. **Grafana**: provision a Prometheus datasource and dashboards from files (PG exporter dashboard 9628, MinIO 13502), with the admin password from `random_password` in foundation. It makes the monitoring part easy to demo.
+4. **Drop `--web.enable-lifecycle`**: the config is supplied through `upload`, so a config change already replaces the container. The flag only exposes unauthenticated `/-/reload` and `/-/quit`.
+5. **Smaller points**: `prometheus_port` / `scrape_interval` in the module have no `description`. `bootstrap.sql.tftpl` and the `PW_MONITORING` line in `bootstrap.tf` lack a trailing newline / trailing comma (`terraform fmt` won't catch the comma). MinIO metrics are `public`, which is fine because port 9000 binds to `127.0.0.1`, but it's worth one comment.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#15 · Monitoring network isolation plan</strong></summary>
+
+> **Prompt**
+>
+> please apply point 4 for me. about points 2 and 3, i'm planning to add grafana with alerts after this commit. explain and plan point 1 for me please
+
+**Answer**
+
+**Point 4 applied**: removed `--web.enable-lifecycle` from `terraform/modules/monitoring/prometheus.tf`. Ran `make up`, which replaced only the Prometheus container, then `make test`: 20/20 passed.
+
+**Point 1, the problem**: there are two networks, but Prometheus joins both, so the split doesn't isolate anything. Prometheus has an unauthenticated UI on the host and can currently open connections to `postgres:5432` and to any future service on `sdg-data`. The only reason it joined `sdg-data` is to reach MinIO.
+
+**Target layout**: each component joins only the networks it needs.
+- `sdg-data`: minio, postgres, bootstraps, postgres-exporter.
+- `sdg-monitoring`: prometheus, postgres-exporter, minio (for metrics only), and later grafana.
+- The exporter is the controlled bridge to Postgres. It logs in as a `pg_monitor` role with a connection limit.
+
+**Plan**:
+1. `modules/minio`: add `variable "monitoring_network" { type = string, default = null }` and a `dynamic "networks_advanced"` that joins it with alias `minio` when it is set. The module still works without monitoring.
+2. `platform/main.tf`: pass `monitoring_network = local.foundation.networks.monitoring` to the minio module.
+3. `modules/monitoring/prometheus.tf`: remove the `data_network` block from Prometheus. Keep it on the exporter. `minio_target` stays `minio:9000` because the alias resolves on the monitoring network too.
+4. Tests: add `expect_fail "monitoring network cannot reach postgres"`, which runs `pg_isready -h postgres` in a container on `sdg-monitoring`. This guards against regressions.
+5. README graph: Prometheus loses "(also on sdg-data)", MinIO gains "(also on sdg-monitoring)".
+
+**Caveats**:
+- MinIO serves metrics on the same port as the S3 API (9000), so Prometheus can still reach the API. The API needs credentials, so that is acceptable.
+- Changing `networks_advanced` forces the MinIO container to be replaced. Data stays in the foundation volume, and the bootstrap re-runs idempotently.
+- `internal = true` on `sdg-monitoring` would also cut egress, but Docker can't publish ports from internal-only networks, so `:9090` (and Grafana later) would break.
+
+No graph change for point 4.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#16 · Isolation review & graph update</strong></summary>
+
+> **Prompt**
+>
+> made the changes you planned on the last prompt. check if they make sense, update README graph
+
+**Answer**
+
+**Review**: the changes follow the plan and make sense. `terraform fmt` and `validate` pass. The stack is down, so `make test` was not run.
+- MinIO joins `sdg-monitoring` through an optional `dynamic "networks_advanced"` with alias `minio`, so the module still works without monitoring.
+- Prometheus is on `sdg-monitoring` only. The exporter is the only container on both networks, and it logs in as the `pg_monitor` role with `CONNECTION LIMIT 5`.
+- The `expect_fail` test on `sdg-monitoring` guards the isolation. `pg_stat_statements` is preloaded and created, which matches `--collector.stat_statements`.
+
+Small fixes:
+1. In `modules/monitoring/variables.tf`, the `minio_target` description still says "as seen from the data network". It is now the monitoring network.
+2. `prometheus_port`, `scrape_interval`, `prometheus_image` and `postgres_exporter_image` have no `description`.
+3. `bootstrap.sql.tftpl` still has no trailing newline.
+4. `MINIO_PROMETHEUS_AUTH_TYPE=public` has no comment explaining that it is safe because `:9000` is bound to `127.0.0.1`.
+
+**README**: Added prometheus (monitoring network only), postgres-exporter (also on `sdg-data`), the `sdg-prometheus-data` volume, `:9090`, the scrape edges and the `pg_monitor` edge to the graph. MinIO is marked "also on sdg-monitoring". Added back the Prometheus bullet under Testing.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#17 · PROMPTS.md readability</strong></summary>
+
+> **Prompt**
+>
+> can you make PROMPTS.md a bit more readable? idk use spacing or boxes or whatever you see fit
+
+**Answer**
+
+Reformatted every entry. Prompts and answers are unchanged.
+- An index table of `# | Topic` at the top.
+- The summary is now a short title, `#N · topic`, so the collapsed list is scannable instead of showing the full prompt text.
+- Inside each dropdown, the verbatim prompt sits in a quoted **Prompt** box, followed by an **Answer** label.
+- `---` separators between entries.
+
+Updated the rule in `CLAUDE.md` to describe the new format. No graph change.
+
+</details>
+
+---

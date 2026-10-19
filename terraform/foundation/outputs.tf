@@ -36,7 +36,7 @@ output "minio_app_password" {
 }
 
 output "postgres_passwords" {
-  description = "PostgreSQL passwords, keyed by role function (superuser, orchestrator, warehouse)."
+  description = "PostgreSQL passwords, keyed by role function (superuser, orchestrator, warehouse, monitoring)."
   value       = { for k, v in random_password.postgres : k => v.result }
   sensitive   = true
 }

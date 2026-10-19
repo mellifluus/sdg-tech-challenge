@@ -22,6 +22,7 @@ resource "docker_container" "bootstrap" {
       "PGCONNECT_TIMEOUT=10",
       # Re-run the job whenever the server container is replaced.
       "POSTGRES_CONTAINER_ID=${docker_container.postgres.id}",
+      "PW_MONITORING=${var.monitoring_password}",
     ],
     [for db in local.db_names : "PW_${db}=${var.databases[db].password}"],
   )

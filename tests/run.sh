@@ -17,6 +17,7 @@ out=$(terraform -chdir="$TF_DIR" output -json)
 tf() { jq -r "$1" <<<"$out"; }
 
 NETWORK=$(tf .networks.value.data)
+MON_NETWORK=$(tf .networks.value.monitoring)
 MC_IMAGE=$(tf .mc_image.value)
 PG_IMAGE=$(tf .postgres_image.value)
 MINIO_API=$(tf .minio.value.api_url)
@@ -26,6 +27,7 @@ BUCKET=$(tf '.minio.value.buckets[0]')
 PG_HOST=$(tf .postgres.value.internal_host)
 ORCH_DB=$(tf .postgres.value.orchestrator_db)
 WH_DB=$(tf .postgres.value.warehouse_db)
+PROMETHEUS=$(tf .monitoring.value.prometheus_url)
 
 # mc aliases "root" and "app", passed to the container by env var name only
 export MC_HOST_root="${MINIO_INTERNAL/:\/\//://$(tf .minio.value.root_user):$(tf .minio_root_password.value)@}"
@@ -61,6 +63,24 @@ psql_as() {
   PGPASSWORD=$(tf ".postgres_passwords.value[\"$role\"]") \
     docker run --rm -i --network "$NETWORK" -e PGPASSWORD -e PGCONNECT_TIMEOUT=5 "$PG_IMAGE" \
     psql -h "$PG_HOST" -U "$role" -d "$db" -X -q -A -t -v ON_ERROR_STOP=1 "$@"
+}
+
+# prom_query <promql>: first sample value, empty if no result
+# shellcheck disable=SC2329 # invoked via poll_eq
+prom_query() {
+  curl -fsS "$PROMETHEUS/api/v1/query" --data-urlencode "query=$1" 2>/dev/null |
+    jq -r '.data.result[0].value[1] // empty'
+}
+
+# poll_eq "<description>" <expected> cmd...: retries cmd for ~60s (first scrape may be pending)
+poll_eq() {
+  local d=$1 want=$2 got=; shift 2
+  for _ in $(seq 30); do
+    got=$("$@" || true)
+    [ "$got" = "$want" ] && break
+    sleep 2
+  done
+  expect_eq "$d" "$want" "$got"
 }
 
 sha() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi | cut -d' ' -f1; }
@@ -102,6 +122,23 @@ for role in "$ORCH_DB" "$WH_DB"; do
     fi
   done
 done
+
+# PROMETHEUS
+
+section "Prometheus"
+expect_ok "ready ($PROMETHEUS)" \
+  curl -fsS --retry 5 --retry-connrefused --retry-delay 2 "$PROMETHEUS/-/ready"
+
+# shellcheck disable=SC2329 # invoked via poll_eq
+down_targets() {
+  curl -fsS "$PROMETHEUS/api/v1/targets?state=active" |
+    jq -r '[.data.activeTargets[] | select(.health != "up") | .labels.job] | join(",")'
+}
+poll_eq "all scrape targets up" "" down_targets
+poll_eq "exporter connected to PostgreSQL (pg_up)" "1" prom_query 'pg_up'
+poll_eq "MinIO reports online nodes" "1" prom_query 'minio_cluster_nodes_online_total'
+expect_fail "monitoring network cannot reach PostgreSQL directly" \
+  docker run --rm --network "$MON_NETWORK" "$PG_IMAGE" pg_isready -h "$PG_HOST" -t 3
 
 # E2E: bucket -> warehouse
 

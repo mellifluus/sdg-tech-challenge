@@ -82,3 +82,29 @@ variable "warehouse_db_name" {
   type        = string
   default     = "warehouse"
 }
+
+# MONITORING
+
+variable "prometheus_image" {
+  description = "Prometheus image."
+  type        = string
+  default     = "prom/prometheus:v3.5.0"
+}
+
+variable "prometheus_port" {
+  description = "Host port for the Prometheus UI / API."
+  type        = number
+  default     = 9090
+}
+
+variable "prometheus_retention" {
+  description = "Prometheus db retention."
+  type        = string
+  default     = "15d"
+}
+
+variable "postgres_exporter_image" {
+  description = "Prometheus PostgreSQL exporter image."
+  type        = string
+  default     = "prometheuscommunity/postgres-exporter:v0.18.1"
+}

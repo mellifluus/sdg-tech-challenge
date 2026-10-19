@@ -14,6 +14,7 @@ resource "docker_container" "minio" {
   env = [
     "MINIO_ROOT_USER=${var.root_user}",
     "MINIO_ROOT_PASSWORD=${var.root_password}",
+    "MINIO_PROMETHEUS_AUTH_TYPE=public",
   ]
 
   ports {
@@ -36,6 +37,15 @@ resource "docker_container" "minio" {
   networks_advanced {
     name    = var.network_name
     aliases = ["minio"]
+  }
+
+  # Optional second network so Prometheus can scrape metrics without joining the data network.
+  dynamic "networks_advanced" {
+    for_each = var.monitoring_network == null ? [] : [var.monitoring_network]
+    content {
+      name    = networks_advanced.value
+      aliases = ["minio"]
+    }
   }
 
   dynamic "labels" {

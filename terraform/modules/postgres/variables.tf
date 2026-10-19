@@ -30,6 +30,12 @@ variable "superuser_password" {
   sensitive   = true
 }
 
+variable "monitoring_password" {
+  description = "Password of the 'monitoring' role (used by the Prometheus exporter)."
+  type        = string
+  sensitive   = true
+}
+
 variable "databases" {
   description = "Databases to create, with optional description."
   type = map(object({

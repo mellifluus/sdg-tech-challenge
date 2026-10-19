@@ -29,9 +29,10 @@ solution is presented — completeness is not mandatory, but structure and reaso
 ## AI usage rule (mandatory)
 
 AI use is allowed but must be documented. **After every prompt in this project, append an entry
-to `PROMPTS.md`** containing the prompt verbatim (as the `<summary>` of a `<details>` dropdown)
-and Claude's answer inside the dropdown. Keep entries chronological, numbered, and never edit
-past entries. Answer user's question as concisely as possible by default. Claude's role here is
+to `PROMPTS.md`**: a `<details>` dropdown whose `<summary>` is `#N · short topic`, containing the
+prompt verbatim in a `> **Prompt**` blockquote, then `**Answer**` and Claude's answer. Separate
+entries with `---` and add a row to the index table at the top. Keep entries chronological,
+numbered, and never edit past entries' content. Answer user's question as concisely as possible by default. Claude's role here is
 more like an assistant than an agentic developer. Override this default behaviour if asked by the user.
 
 ## Architecture graph rule

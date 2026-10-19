@@ -16,3 +16,10 @@ REVOKE ALL ON DATABASE "${db}" FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE "${db}" TO "${db}";
 
 %{ endfor }
+
+SELECT 'CREATE ROLE monitoring LOGIN'
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'monitoring')\gexec
+\getenv pw_monitoring PW_MONITORING
+ALTER ROLE monitoring WITH LOGIN PASSWORD :'pw_monitoring' CONNECTION LIMIT 5;
+GRANT pg_monitor TO monitoring;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

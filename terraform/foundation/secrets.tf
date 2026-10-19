@@ -13,7 +13,7 @@ resource "random_password" "minio_app" {
 }
 
 resource "random_password" "postgres" {
-  for_each = toset(["superuser", "orchestrator", "warehouse"])
+  for_each = toset(["superuser", "orchestrator", "warehouse", "monitoring"])
 
   length  = 32
   special = false

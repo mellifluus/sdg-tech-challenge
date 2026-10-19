@@ -7,6 +7,11 @@ output "internal_host" {
   value       = "postgres"
 }
 
+output "internal_address" {
+  description = "host:port reachable from other containers on the same network."
+  value       = "postgres:5432"
+}
+
 output "host_endpoint" {
   value = "${var.bind_address}:${var.port}"
 }

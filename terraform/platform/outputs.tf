@@ -67,3 +67,10 @@ output "postgres_image" {
   description = "PostgreSQL image (also provides psql / pg_isready)."
   value       = var.postgres_image
 }
+
+output "monitoring" {
+  description = "Monitoring endpoints."
+  value = {
+    prometheus_url = module.monitoring.prometheus_url
+  }
+}

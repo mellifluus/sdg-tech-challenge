@@ -13,6 +13,12 @@ variable "network_name" {
   type        = string
 }
 
+variable "monitoring_network" {
+  description = "Optional monitoring network the container also joins (metrics scraping)."
+  type        = string
+  default     = null
+}
+
 variable "root_user" {
   description = "MinIO root user."
   type        = string

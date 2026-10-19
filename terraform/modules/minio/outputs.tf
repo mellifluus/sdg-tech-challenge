@@ -7,6 +7,11 @@ output "internal_endpoint" {
   value       = "http://minio:9000"
 }
 
+output "internal_address" {
+  description = "API host:port reachable from other containers on the same network (scrape target)."
+  value       = "minio:9000"
+}
+
 output "api_url" {
   value = "http://${var.bind_address}:${var.api_port}"
 }

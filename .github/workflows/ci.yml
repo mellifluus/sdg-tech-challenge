@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "1"
+  TF_INPUT: "0"
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
+
+jobs:
+  lint:
+    name: Lint & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tf
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.tf.outputs.version }}
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: tf-plugins-${{ hashFiles('terraform/**/.terraform.lock.hcl', 'terraform/**/versions.tf') }}
+
+      - name: fmt check, validate, tflint
+        run: make lint
+
+      - name: shellcheck
+        run: shellcheck -x tests/*.sh
+
+  deploy-test:
+    name: Deploy, test, destroy
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tf
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.tf.outputs.version }}
+          terraform_wrapper: true
+
+      - run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: tf-plugins-${{ hashFiles('terraform/**/.terraform.lock.hcl', 'terraform/**/versions.tf') }}
+
+      - name: Deploy stack (single command)
+        run: make up
+
+      - name: Integration tests
+        run: make test
+
+      - name: Persistence test (recreate platform layer)
+        run: make test-persistence
+
+      - name: Idempotency (no drift after apply)
+        run: |
+          terraform -chdir=terraform/foundation plan -detailed-exitcode
+          terraform -chdir=terraform/platform plan -detailed-exitcode
+
+      - name: Dump container state and logs
+        if: failure()
+        run: |
+          docker ps -a
+          for c in $(docker ps -aq); do
+            echo "::group::$(docker inspect -f '{{.Name}}' "$c")"
+            docker logs --tail 200 "$c" 2>&1 || true
+            echo "::endgroup::"
+          done
+
+      - name: Tear down everything
+        if: always()
+        run: make nuke

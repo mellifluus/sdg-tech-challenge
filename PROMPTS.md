@@ -26,6 +26,8 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 19 | Grafana in `make credentials` |
 | 20 | Missing Grafana home dashboard |
 | 21 | Grafana tests & graph |
+| 22 | Persistence test & CI pipeline |
+| 23 | ShellCheck unused warnings in lib.sh |
 
 ---
 
@@ -612,3 +614,24 @@ Ran it against the live stack: 26 passed, 0 failed. Updated the README graph wit
 </details>
 
 ---
+
+<details>
+<summary><strong>#22 · Persistence test & CI pipeline</strong></summary>
+
+> **Prompt**
+>
+> please add a persistence test now.
+
+**Answer**
+
+- **Shared helpers**: moved the config and helpers from `tests/run.sh` into `tests/lib.sh`. Both test scripts source it.
+- **`tests/persistence.sh`** (`make test-persistence`) runs in three steps:
+  1. Writes a marker to MinIO (object), PostgreSQL (row) and Grafana (annotation), and records a timestamp Prometheus has samples for.
+  2. Runs `make down` and `make up`. It checks that no stack container is left after `down`, that the four foundation volumes still exist, and that every container ID is new after `up`.
+  3. Reads each marker back, then cleans up.
+
+  It restarts the stack, so `make test` doesn't run it. Local run: 17 passed, 0 failed (`make test` is still 26 passed).
+
+- **README**: added the Testing section. In the graph, the tests node is relabelled to include `persistence.sh`.
+
+</details>

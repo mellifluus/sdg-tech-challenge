@@ -13,7 +13,7 @@ flowchart TB
             bootstrap["minio-bootstrap<br/>(one-shot mc job)"]
             postgres["postgres<br/>(PostgreSQL server)"]
             pg_bootstrap["postgres-bootstrap<br/>(one-shot psql job)"]
-            tests["tests/run.sh<br/>(ephemeral mc / psql containers)"]
+            tests["tests/run.sh, persistence.sh<br/>(ephemeral mc / psql containers)"]
         end
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
             prometheus["prometheus<br/>(metrics, monitoring network only)"]
@@ -65,5 +65,13 @@ checks, so it can run as-is in CI.
 - **Prometheus**: ready, all scrape targets `up`, `pg_up == 1`, MinIO reports online nodes
   (polled for ~60s so the first scrape can land), and a container on `sdg-monitoring` cannot
   reach PostgreSQL directly.
+- **Grafana**: healthy, anonymous API access rejected, Prometheus datasource healthy, the
+  overview dashboard is provisioned, and every rule in `grafana-alerts.yml` is loaded.
 - **E2E**: streams the fixture out of the bucket into `warehouse.e2e_orders` (truncate + load
   in one transaction) and checks the row count and total.
+
+`make test-persistence` (or `./tests/persistence.sh`) checks that data survives the containers.
+It writes a marker to MinIO (object), PostgreSQL (row) and Grafana (annotation), and notes a
+timestamp Prometheus has samples for. Then it runs `make down` and `make up`, checks that every
+container was recreated while the foundation volumes stayed, and reads each marker back. It
+restarts the stack, so `make test` doesn't run it.

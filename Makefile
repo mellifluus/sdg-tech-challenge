@@ -12,7 +12,7 @@ LAYERS         := foundation platform
 TF_FOUNDATION  := terraform -chdir=$(TF_DIR)/foundation
 TF_PLATFORM    := terraform -chdir=$(TF_DIR)/platform
 
-.PHONY: help init validate plan apply up destroy down nuke output credentials test fmt fmt-check lint pre-commit clean
+.PHONY: help init validate plan apply up destroy down nuke output credentials test test-persistence fmt fmt-check lint pre-commit clean
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m [ARGS=\"...\"]\n\n"} \
@@ -77,6 +77,9 @@ credentials: ## Print endpoints and credentials needed to test the stack
 
 test: ## Run the integration tests against the deployed stack
 	./tests/run.sh
+
+test-persistence: ## Recreate the platform layer and check data survives (restarts containers)
+	./tests/persistence.sh
 
 ## Code quality
 

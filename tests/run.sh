@@ -54,7 +54,7 @@ section "Prometheus"
 expect_ok "ready ($PROMETHEUS)" \
   curl -fsS --retry 5 --retry-connrefused --retry-delay 2 "$PROMETHEUS/-/ready"
 
-# shellcheck disable=SC2329 # invoked via poll_eq
+# shellcheck disable=SC2317,SC2329 # invoked via poll_eq
 down_targets() {
   curl -fsS "$PROMETHEUS/api/v1/targets?state=active" |
     jq -r '[.data.activeTargets[] | select(.health != "up") | .labels.job] | join(",")'
@@ -93,7 +93,7 @@ expect_ok "create table '$E2E_TABLE' if missing" psql_as "$WH_DB" "$WH_DB" -c "
   )"
 
 # Truncate + load in one transaction, so re-runs are idempotent.
-# shellcheck disable=SC2329 # invoked via expect_ok
+# shellcheck disable=SC2317,SC2329 # invoked via expect_ok
 load() {
   mc cat "app/$BUCKET/$FIXTURE_KEY" | psql_as "$WH_DB" "$WH_DB" -1 \
     -c "TRUNCATE $E2E_TABLE" \

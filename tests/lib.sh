@@ -1,4 +1,4 @@
-# shellcheck shell=bash disable=SC2034,SC2329 # library: vars and functions are used by the sourcing scripts
+# shellcheck shell=bash disable=SC2034,SC2317,SC2329 # library: vars and functions are used by the sourcing scripts
 # Shared config and helpers for the test scripts. Source it, don't run it.
 # Reads everything from `terraform output`, runs mc / psql in throwaway containers attached to
 # the stack network. Requires: docker, terraform, jq, curl.

@@ -18,10 +18,12 @@ flowchart TB
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
             prometheus["prometheus<br/>(metrics, monitoring network only)"]
             pg_exporter["postgres-exporter<br/>(also on sdg-data)"]
+            grafana["grafana<br/>(dashboards, alerts)"]
         end
         minio_vol[("sdg-minio-data<br/>volume (foundation)")]
         pg_vol[("sdg-postgres-data<br/>volume (foundation)")]
         prom_vol[("sdg-prometheus-data<br/>volume (foundation)")]
+        grafana_vol[("sdg-grafana-data<br/>volume (foundation)")]
     end
     host(["Host"])
 
@@ -38,6 +40,9 @@ flowchart TB
     prometheus -- "scrape /minio/v2/metrics" --> minio
     prometheus -- "scrape :9187" --> pg_exporter
     pg_exporter -- "pg_monitor role" --> postgres
+    host -- ":3000 UI" --> grafana
+    grafana -- "PromQL datasource" --> prometheus
+    grafana --- grafana_vol
 ```
 
 Two Terraform root modules with separate states: `terraform/foundation` (networks, volumes,

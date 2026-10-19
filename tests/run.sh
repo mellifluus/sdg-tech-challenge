@@ -28,6 +28,10 @@ PG_HOST=$(tf .postgres.value.internal_host)
 ORCH_DB=$(tf .postgres.value.orchestrator_db)
 WH_DB=$(tf .postgres.value.warehouse_db)
 PROMETHEUS=$(tf .monitoring.value.prometheus_url)
+GRAFANA=$(tf .monitoring.value.grafana_url)
+GRAFANA_AUTH="$(tf .monitoring.value.grafana_user):$(tf .grafana_admin_password.value)"
+GRAFANA_DASHBOARD="sdg-platform-overview"
+GRAFANA_ALERT_RULES=$(grep -c '^ *- uid: sdg-' "$ROOT_DIR/terraform/modules/monitoring/grafana/grafana-alerts.yml")
 
 # mc aliases "root" and "app", passed to the container by env var name only
 export MC_HOST_root="${MINIO_INTERNAL/:\/\//://$(tf .minio.value.root_user):$(tf .minio_root_password.value)@}"
@@ -139,6 +143,23 @@ poll_eq "exporter connected to PostgreSQL (pg_up)" "1" prom_query 'pg_up'
 poll_eq "MinIO reports online nodes" "1" prom_query 'minio_cluster_nodes_online_total'
 expect_fail "monitoring network cannot reach PostgreSQL directly" \
   docker run --rm --network "$MON_NETWORK" "$PG_IMAGE" pg_isready -h "$PG_HOST" -t 3
+
+# GRAFANA
+
+section "Grafana"
+# grafana_api <path>: authenticated GET as the admin user
+grafana_api() { curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA$1" 2>/dev/null; }
+
+expect_ok "healthy ($GRAFANA)" \
+  curl -fsS --retry 5 --retry-connrefused --retry-delay 2 "$GRAFANA/api/health"
+expect_eq "anonymous API access rejected" "401" \
+  "$(curl -sS -o /dev/null -w '%{http_code}' "$GRAFANA/api/search")"
+expect_eq "Prometheus datasource healthy" "OK" \
+  "$(grafana_api /api/datasources/uid/prometheus/health | jq -r .status)"
+expect_eq "dashboard '$GRAFANA_DASHBOARD' provisioned" "true" \
+  "$(grafana_api "/api/dashboards/uid/$GRAFANA_DASHBOARD" | jq -r .meta.provisioned)"
+expect_eq "alert rules provisioned (one per rule in grafana-alerts.yml)" "$GRAFANA_ALERT_RULES" \
+  "$(grafana_api /api/v1/provisioning/alert-rules | jq '[.[] | select(.uid | startswith("sdg-"))] | length')"
 
 # E2E: bucket -> warehouse
 

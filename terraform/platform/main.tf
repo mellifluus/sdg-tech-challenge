@@ -63,5 +63,11 @@ module "monitoring" {
   postgres_monitoring_password = local.foundation.postgres_passwords.monitoring
   minio_target                 = module.minio.internal_address
 
+  grafana_image          = var.grafana_image
+  grafana_port           = var.grafana_port
+  grafana_volume         = local.foundation.volumes.grafana
+  grafana_admin_user     = var.grafana_admin_user
+  grafana_admin_password = local.foundation.grafana_admin_password
+
   depends_on = [module.postgres, module.minio]
 }

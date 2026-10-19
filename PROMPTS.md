@@ -22,6 +22,10 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 15 | Monitoring network isolation plan |
 | 16 | Isolation review & graph update |
 | 17 | PROMPTS.md readability |
+| 18 | Grafana dashboard & alerts |
+| 19 | Grafana in `make credentials` |
+| 20 | Missing Grafana home dashboard |
+| 21 | Grafana tests & graph |
 
 ---
 
@@ -547,6 +551,63 @@ Reformatted every entry. Prompts and answers are unchanged.
 - `---` separators between entries.
 
 Updated the rule in `CLAUDE.md` to describe the new format. No graph change.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#18 · Grafana dashboard & alerts</strong></summary>
+
+> **Prompt**
+>
+> can you set up a grafana-dashboards.yml and platform-overview.json files @terraform/modules/monitoring/grafana? with alerts possibly. i'll work on the rest
+
+**Answer**
+
+Added three files in `terraform/modules/monitoring/grafana/`:
+- `grafana-dashboards.yml` is the file dashboard provider. It reads `/etc/grafana/dashboards`, puts dashboards in the "SDG Platform" folder and blocks UI edits, so Terraform stays the source of truth.
+- `platform-overview.json` (uid `sdg-platform-overview`) has four rows. Overview: up/down per service, firing alerts, `data-bucket` objects. MinIO: nodes, capacity, S3 requests, errors and traffic, bucket sizes. PostgreSQL: uptime, connections, cache hit, deadlocks, TPS, DB sizes, rows/s. Prometheus: scrape duration and samples. It has `$datasource` and `$database` variables.
+- `grafana-alerts.yml` holds unified alerting rules: target down, `pg_up` = 0, connections > 80%, deadlocks, MinIO node offline, free capacity < 10%, S3 error rate > 5%, and `data-bucket` missing.
+
+To wire it up: provision the Prometheus datasource with `uid: prometheus` (the alerts reference it). Upload the provider yml to `provisioning/dashboards/`, the JSON to `/etc/grafana/dashboards/` and the alerts to `provisioning/alerting/`. The README graph is unchanged because the Grafana container doesn't exist yet.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#19 · Grafana in `make credentials`</strong></summary>
+
+> **Prompt**
+>
+> can you update the make credentials command to show grafana credentials
+
+**Answer**
+
+Added a **Monitoring** section to `make credentials`. It shows the Prometheus URL, Grafana URL, Grafana admin user (from the `monitoring` output) and Grafana admin password (from the sensitive `grafana_admin_password` output). Tested it against mock output JSON. No graph change.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#21 · Grafana tests & graph</strong></summary>
+
+> **Prompt**
+>
+> the grafana dashboards seem to work. add some tests if you deem necessary, then update the graph if needed
+
+**Answer**
+
+Added a **Grafana** section to `tests/run.sh` with five checks:
+- `/api/health` responds.
+- Anonymous API access gets a 401.
+- The Prometheus datasource health check returns OK.
+- Dashboard `sdg-platform-overview` exists and is provisioned.
+- The number of provisioned `sdg-*` alert rules matches the count in `grafana-alerts.yml`.
+
+Ran it against the live stack: 26 passed, 0 failed. Updated the README graph with the `grafana` container on `sdg-monitoring`, the `sdg-grafana-data` volume, host port `:3000` and the Grafana → Prometheus datasource edge.
 
 </details>
 

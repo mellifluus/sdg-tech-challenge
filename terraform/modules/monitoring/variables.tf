@@ -72,3 +72,31 @@ variable "minio_target" {
   description = "MinIO host:port as seen from the monitoring network."
   type        = string
 }
+
+variable "grafana_image" {
+  description = "Docker image for Grafana."
+  type        = string
+}
+
+variable "grafana_port" {
+  description = "Port Grafana binds to."
+  type        = number
+  default     = 3000
+}
+
+variable "grafana_volume" {
+  description = "Named volume for Grafana's DB."
+  type        = string
+}
+
+variable "grafana_admin_user" {
+  description = "Grafana admin user."
+  type        = string
+  default     = "admin"
+}
+
+variable "grafana_admin_password" {
+  description = "Grafana admin password."
+  type        = string
+  sensitive   = true
+}

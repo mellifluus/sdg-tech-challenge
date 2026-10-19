@@ -72,5 +72,12 @@ output "monitoring" {
   description = "Monitoring endpoints."
   value = {
     prometheus_url = module.monitoring.prometheus_url
+    grafana_url    = module.monitoring.grafana_url
+    grafana_user   = var.grafana_admin_user
   }
+}
+
+output "grafana_admin_password" {
+  value     = local.foundation.grafana_admin_password
+  sensitive = true
 }

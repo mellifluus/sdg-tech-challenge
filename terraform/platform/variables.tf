@@ -108,3 +108,21 @@ variable "postgres_exporter_image" {
   type        = string
   default     = "prometheuscommunity/postgres-exporter:v0.18.1"
 }
+
+variable "grafana_image" {
+  description = "Grafana image."
+  type        = string
+  default     = "grafana/grafana:12.2.0"
+}
+
+variable "grafana_port" {
+  description = "Host port for the Grafana UI."
+  type        = number
+  default     = 3000
+}
+
+variable "grafana_admin_user" {
+  description = "Grafana admin user."
+  type        = string
+  default     = "admin"
+}

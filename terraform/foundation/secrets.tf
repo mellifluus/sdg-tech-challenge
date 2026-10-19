@@ -18,3 +18,8 @@ resource "random_password" "postgres" {
   length  = 32
   special = false
 }
+
+resource "random_password" "grafana_admin" {
+  length  = 24
+  special = false
+}

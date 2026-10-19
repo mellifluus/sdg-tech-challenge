@@ -1,0 +1,244 @@
+# Unified alerting rules: mount at /etc/grafana/provisioning/alerting/grafana-alerts.yml.
+# Expects a Prometheus datasource provisioned with `uid: prometheus`.
+# Every rule follows the same shape: A = PromQL query, B = reduce(last), C = threshold.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: sdg-platform
+    folder: SDG Platform
+    interval: 1m
+    rules:
+      - uid: sdg-target-down
+        title: Scrape target down
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.instance }})"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, expr: "up", instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: sdg-postgres-down
+        title: PostgreSQL down
+        condition: C
+        for: 1m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "postgres-exporter reports PostgreSQL as unreachable (pg_up == 0)"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, expr: "pg_up", instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: sdg-postgres-connections
+        title: PostgreSQL connections above 80%
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL is using {{ humanizePercentage $values.B.Value }} of max_connections"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: "sum(pg_stat_database_numbackends) / max(pg_settings_max_connections)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.8] }
+
+      - uid: sdg-postgres-deadlocks
+        title: PostgreSQL deadlocks detected
+        condition: C
+        for: 0s
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deadlocks in database {{ $labels.datname }} over the last 5 minutes"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: "sum by (datname) (increase(pg_stat_database_deadlocks[5m]))"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: sdg-minio-nodes-offline
+        title: MinIO node offline
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $values.B.Value }} MinIO node(s) offline"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, expr: "max(minio_cluster_nodes_offline_total)", instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: sdg-minio-capacity
+        title: MinIO free capacity below 10%
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "MinIO has {{ humanizePercentage $values.B.Value }} usable capacity left"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: "max(minio_cluster_capacity_usable_free_bytes) / max(minio_cluster_capacity_usable_total_bytes)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [0.1] }
+
+      - uid: sdg-minio-s3-errors
+        title: MinIO S3 error rate above 5%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ humanizePercentage $values.B.Value }} of S3 requests are failing"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              # clamp_min avoids a division by zero on an idle cluster.
+              expr: "sum(rate(minio_s3_requests_errors_total[5m])) / clamp_min(sum(rate(minio_s3_requests_total[5m])), 1e-9)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      # Guards the challenge's validation requirement. Bucket usage comes from the MinIO
+      # scanner, which can lag a few minutes after a fresh deploy, hence the long `for`.
+      - uid: sdg-data-bucket-missing
+        title: data-bucket missing
+        condition: C
+        for: 15m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO reports no usage metrics for bucket data-bucket"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: 'absent(minio_bucket_usage_object_total{bucket="data-bucket"})'
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

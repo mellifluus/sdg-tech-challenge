@@ -40,3 +40,9 @@ output "postgres_passwords" {
   value       = { for k, v in random_password.postgres : k => v.result }
   sensitive   = true
 }
+
+output "grafana_admin_password" {
+  description = "Grafana admin password."
+  value       = random_password.grafana_admin.result
+  sensitive   = true
+}

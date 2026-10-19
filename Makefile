@@ -66,7 +66,13 @@ credentials: ## Print endpoints and credentials needed to test the stack
 		"", \
 		"PostgreSQL (\(.postgres.value.host_endpoint))", \
 		(.postgres_passwords.value | to_entries[] | \
-			"  \(.key | . + ":" | .[0:14] + (" " * (14 - length)))  \(.value)") \
+			"  \(.key | . + ":" | .[0:14] + (" " * (14 - length)))  \(.value)"), \
+		"", \
+		"Monitoring", \
+		"  Prometheus:     \(.monitoring.value.prometheus_url)", \
+		"  Grafana:        \(.monitoring.value.grafana_url)", \
+		"  Grafana user:   \(.monitoring.value.grafana_user)", \
+		"  Grafana pass:   \(.grafana_admin_password.value)" \
 	' <<< "$$out"
 
 test: ## Run the integration tests against the deployed stack

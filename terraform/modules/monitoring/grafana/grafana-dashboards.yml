@@ -1,0 +1,16 @@
+# Dashboard provider: mount at /etc/grafana/provisioning/dashboards/grafana-dashboards.yml
+# and upload the JSON dashboards under /etc/grafana/dashboards (outside the data volume,
+# so Terraform stays the source of truth on every recreate).
+apiVersion: 1
+
+providers:
+  - name: sdg-platform
+    orgId: 1
+    folder: SDG Platform
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

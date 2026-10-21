@@ -36,6 +36,7 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 29 | Airflow DAG tests |
 | 30 | StatsD mapping for Airflow |
 | 31 | Airflow Grafana dashboard & alerts |
+| 32 | Readable architecture graph |
 
 ---
 
@@ -895,5 +896,26 @@ Two gotchas from the data:
 Every query ran successfully against the live Prometheus, and the YAML parses. Not applied yet: `make up` re-uploads the files to Grafana.
 
 **Graph:** no change, since there are no new containers, networks or ports.
+
+</details>
+
+---
+
+<details>
+<summary>#32 · Readable architecture graph</summary>
+
+> **Prompt**
+>
+> i won't add any more containers/volumes/etc. the graph in readme.md should be complete. can you make it more readable? for reference, attaching the current graph as a screenshot
+
+**Answer**
+
+I rewrote the Mermaid graph in `README.md` and rendered it locally with mermaid-cli to check the layout. Same components, fewer crossing lines:
+- **No `Host` node:** each published port is in its container's label (e.g. `host :8080`), which removes five long edges.
+- **Three bands:** `sdg-monitoring` at the top, a middle "on both networks" group (minio, statsd-exporter, postgres-exporter) instead of "(also on …)" notes, and `sdg-data` at the bottom.
+- **Edge styles:** solid for data traffic, dotted for monitoring (scrape, StatsD, PromQL, pg_monitor).
+- **One-shot jobs** have dashed borders, and volumes are yellow cylinders next to their container.
+- **Fewer edges:** Airflow connects to the logs volume and the metadata DB once as a group instead of once per component.
+- **Short labels:** "(foundation)" was removed from every label. A note under the graph explains the styles and that `terraform/foundation` owns all networks and volumes.
 
 </details>

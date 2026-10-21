@@ -72,7 +72,12 @@ credentials: ## Print endpoints and credentials needed to test the stack
 		"  Prometheus:     \(.monitoring.value.prometheus_url)", \
 		"  Grafana:        \(.monitoring.value.grafana_url)", \
 		"  Grafana user:   \(.monitoring.value.grafana_user)", \
-		"  Grafana pass:   \(.grafana_admin_password.value)" \
+		"  Grafana pass:   \(.grafana_admin_password.value)", \
+		"", \
+		"Airflow", \
+		"  UI / API:       \(.airflow.value.url)", \
+		"  Admin user:     \(.airflow.value.admin_user)", \
+		"  Admin password: \(.airflow_admin_password.value)" \
 	' <<< "$$out"
 
 test: ## Run the integration tests against the deployed stack

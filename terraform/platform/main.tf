@@ -88,9 +88,16 @@ module "airflow" {
   fernet_key     = local.foundation.airflow_secrets.fernet_key
   jwt_secret     = local.foundation.airflow_secrets.jwt_secret
 
-  postgres_host     = module.postgres.internal_host
-  metadata_db       = var.orchestrator_db_name
-  metadata_password = local.foundation.postgres_passwords.orchestrator
+  postgres_host      = module.postgres.internal_host
+  metadata_db        = var.orchestrator_db_name
+  metadata_password  = local.foundation.postgres_passwords.orchestrator
+  warehouse_db       = var.warehouse_db_name
+  warehouse_password = local.foundation.postgres_passwords.warehouse
+
+  minio_endpoint = module.minio.internal_endpoint
+  minio_user     = var.minio_app_user
+  minio_password = local.foundation.minio_app_password
+  data_bucket    = var.minio_buckets[0]
 
   # The bootstrap job creates the airflow role/database.
   depends_on = [module.postgres]

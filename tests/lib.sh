@@ -31,6 +31,7 @@ GRAFANA_ALERT_RULES=$(grep -c '^ *- uid: sdg-' "$ROOT_DIR/terraform/modules/moni
 AIRFLOW=$(tf .airflow.value.url)
 AIRFLOW_USER=$(tf .airflow.value.admin_user)
 AIRFLOW_PASSWORD=$(tf .airflow_admin_password.value)
+AIRFLOW_DAGS_DIR="$ROOT_DIR/terraform/modules/airflow/dags"
 
 # mc aliases "root" and "app", passed to the container by env var name only
 export MC_HOST_root="${MINIO_INTERNAL/:\/\//://$(tf .minio.value.root_user):$(tf .minio_root_password.value)@}"
@@ -80,10 +81,11 @@ prom_query_at() {
     jq -r '.data.result[0].value[1] // empty'
 }
 
-# poll_eq "<description>" <expected> cmd...: retries cmd for ~60s (first scrape may be pending)
+# poll_eq "<description>" <expected> cmd...: retries cmd every 2s, POLL_TRIES times (default 30,
+# ~60s; first scrape may be pending)
 poll_eq() {
   local d=$1 want=$2 got=; shift 2
-  for _ in $(seq 30); do
+  for _ in $(seq "${POLL_TRIES:-30}"); do
     got=$("$@" || true)
     [ "$got" = "$want" ] && break
     sleep 2
@@ -107,4 +109,10 @@ airflow_token() {
   jq -n --arg u "$1" --arg p "$2" '{username: $u, password: $p}' |
     curl -fsS -X POST "$AIRFLOW/auth/token" -H 'Content-Type: application/json' -d @- 2>/dev/null |
     jq -r '.access_token // empty'
+}
+
+# airflow_api <token> <path> [curl args...]: authenticated API call
+airflow_api() {
+  local t=$1 p=$2; shift 2
+  curl -fsS -H "Authorization: Bearer $t" -H 'Content-Type: application/json' "$AIRFLOW$p" "$@" 2>/dev/null
 }

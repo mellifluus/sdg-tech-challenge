@@ -74,3 +74,47 @@ variable "metadata_password" {
   type        = string
   sensitive   = true
 }
+
+variable "warehouse_db" {
+  description = "Destination database the DAGs write to."
+  type        = string
+}
+
+variable "warehouse_password" {
+  description = "Password of the warehouse role."
+  type        = string
+  sensitive   = true
+}
+
+variable "warehouse_conn_id" {
+  description = "Airflow connection id for the warehouse."
+  type        = string
+  default     = "warehouse"
+}
+
+variable "minio_endpoint" {
+  description = "MinIO S3 endpoint on the data network."
+  type        = string
+}
+
+variable "minio_user" {
+  description = "MinIO user the DAGs authenticate as."
+  type        = string
+}
+
+variable "minio_password" {
+  description = "Password of minio_user."
+  type        = string
+  sensitive   = true
+}
+
+variable "minio_conn_id" {
+  description = "Airflow connection id for MinIO."
+  type        = string
+  default     = "minio"
+}
+
+variable "data_bucket" {
+  description = "Bucket the DAGs read from and write to."
+  type        = string
+}

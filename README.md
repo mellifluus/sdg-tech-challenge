@@ -51,6 +51,8 @@ flowchart TB
     af_init -- "schema migrations" --> postgres
     airflow -- "metadata (airflow DB)" --> postgres
     af_sched -- "execution API" --> af_api
+    af_sched -- "DAG tasks: S3 as app user" --> minio
+    af_sched -- "DAG tasks: warehouse DB" --> postgres
     af_api --- af_logs_vol
     af_sched --- af_logs_vol
     af_dagp --- af_logs_vol

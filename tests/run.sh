@@ -96,6 +96,29 @@ expect_ok "admin user '$AIRFLOW_USER' gets an API token" test -n "$token"
 expect_eq "API accepts the admin token" "200" \
   "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "$AIRFLOW/api/v2/dags")"
 
+# DAGs are parsed asynchronously by the dag-processor (refresh every 30s), so poll.
+section "Airflow DAGs"
+# Convention: each top-level file in dags/ defines one DAG named after the file.
+# shellcheck disable=SC2317,SC2329 # invoked via poll_eq
+dag_status() { airflow_api "$token" "/api/v2/dags/$1" | jq -r '"stale=\(.is_stale) paused=\(.is_paused)"'; }
+for f in "$AIRFLOW_DAGS_DIR"/*.py; do
+  dag=$(basename "$f" .py)
+  POLL_TRIES=45 poll_eq "DAG '$dag' registered and unpaused" "stale=false paused=false" dag_status "$dag"
+done
+# Checked after registration: before the first parse there are no errors to report yet.
+expect_eq "no DAG import errors" "" \
+  "$(airflow_api "$token" /api/v2/importErrors | jq -r '.import_errors | map(.filename) | join(",")')"
+
+run_id=$(airflow_api "$token" /api/v2/dags/check_connections/dagRuns -X POST -d '{"logical_date": null}' |
+  jq -r '.dag_run_id // empty')
+expect_ok "trigger 'check_connections'" test -n "$run_id"
+# shellcheck disable=SC2317,SC2329 # invoked via poll_eq
+run_state() {
+  airflow_api "$token" "/api/v2/dags/check_connections/dagRuns/$(jq -rn --arg r "$run_id" '$r | @uri')" | jq -r .state
+}
+# Queued -> running -> success usually takes seconds; allow ~3 min for a cold scheduler.
+POLL_TRIES=90 poll_eq "'check_connections' run succeeds (warehouse + MinIO)" "success" run_state
+
 # E2E: bucket -> warehouse
 
 section "E2E (MinIO -> PostgreSQL)"

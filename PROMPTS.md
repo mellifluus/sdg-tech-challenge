@@ -32,6 +32,8 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 25 | cryptography "Illegal instruction" |
 | 26 | Passwords file permission denied |
 | 27 | Airflow tests & graph |
+| 28 | Connectivity check DAG |
+| 29 | Airflow DAG tests |
 
 ---
 
@@ -777,5 +779,60 @@ Then set `AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE=/opt/airflow/passwor
 - **README**: the graph now has an Airflow subgraph on `sdg-data` (init, api-server, scheduler, dag-processor), the `:8080` host port, metadata going to PostgreSQL, the scheduler calling the api-server's execution API, and the `sdg-airflow-logs-data` volume. The Testing section has a new Airflow bullet.
 
 Verified: shellcheck is clean, and `make test` passes 33, fails 0.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#28 · Connectivity check DAG</strong></summary>
+
+> **Prompt**
+>
+> i wired the warehouse db and minio bucket via env vars to airflow. the ui says "Connections defined via environment variables or secrets managers are not listed here.
+>
+> These are resolved at runtime and are not visible in the UI. Learn more in the Airflow documentation."
+>
+> can you write a manual trigger dag to check connectivity?
+
+**Answer**
+
+Added `terraform/modules/airflow/dags/check_connections.py`: a DAG with `schedule=None`, so it only runs when triggered by hand. It has two tasks that run in parallel:
+
+- **`check_warehouse`** uses `PostgresHook("warehouse")`. It logs the database, user and server version, then creates a temporary table and inserts a row into it to prove it can write. A temp table disappears when the session ends, so nothing is left behind.
+- **`check_minio`** uses `S3Hook("minio")`. It checks that the bucket exists, then writes `_smoke/<run_id>.txt`, reads it back, compares the content, and deletes it. The app user's MinIO policy allows put, get and delete.
+
+Verified: the DAG loads into Airflow's DagBag with no import errors inside `sdg-airflow:local`. It has not been run against the stack yet, because the new env vars aren't applied.
+
+**Likely issue:** the `minio` connection has no `endpoint_url`, so `S3Hook` would call real AWS S3. Add `extra = { endpoint_url = "http://minio:9000" }` (or whatever the MinIO internal endpoint is) to that connection's JSON in `local.connections`.
+
+**Graph:** added the two connections from the scheduler, where `LocalExecutor` runs tasks: to MinIO as the app user, and to the warehouse DB.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#29 · Airflow DAG tests</strong></summary>
+
+> **Prompt**
+>
+> could you add tests for the changes from last commit? probably test that the dags get imported and that the check_connections dag runs successfully. we will likely need some retries as airflow pulls the dags and runs thgem
+
+**Answer**
+
+Added an **Airflow DAGs** section to `tests/run.sh`:
+
+- **Registered:** every top-level `dags/*.py` must show up as a DAG with the same name that is not stale and not paused. This is polled for up to 90s, since the dag-processor re-parses every 30s.
+- **No import errors:** `/api/v2/importErrors` must be empty. This runs *after* the registration check, because before the first parse there are no errors yet and it would pass by accident.
+- **E2E run:** `check_connections` is triggered through the REST API (`logical_date: null`), then its state is polled until it is `success`, for up to 3 minutes.
+
+`tests/lib.sh` changes: `poll_eq` now takes its retry count from `POLL_TRIES` (default 30, so the old behaviour is the same). There is a new `airflow_api <token> <path>` helper, and a new `AIRFLOW_DAGS_DIR` variable.
+
+Verified: shellcheck is clean, and `make test` passes 37, fails 0.
+
+One thing to know: the DAG uses `retries: 1` with the default 5 min `retry_delay`. A failing task would make the poll time out (state `up_for_retry`/`running`) instead of reporting `failed`. The test still fails, and the reason shows in the FAIL message.
+
+**Graph:** no change, since this only touches tests.
 
 </details>

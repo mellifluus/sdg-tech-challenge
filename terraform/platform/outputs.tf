@@ -83,11 +83,12 @@ output "grafana_admin_password" {
 }
 
 output "airflow" {
-  description = "Airflow endpoint."
+  description = "Airflow endpoint and connection ids."
   value = {
-    url        = module.airflow.url
-    admin_user = module.airflow.admin_user
-    image      = module.airflow.image
+    url            = module.airflow.url
+    admin_user     = module.airflow.admin_user
+    image          = module.airflow.image
+    connection_ids = module.airflow.connection_ids
   }
 }
 

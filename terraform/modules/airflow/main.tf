@@ -14,32 +14,58 @@ resource "docker_image" "airflow" {
 locals {
   api_host = "airflow-api-server"
 
-  env = [
-    "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
-    "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.metadata_db}:${var.metadata_password}@${var.postgres_host}:5432/${var.metadata_db}",
-    "AIRFLOW__CORE__FERNET_KEY=${var.fernet_key}",
-    "AIRFLOW__API_AUTH__JWT_SECRET=${var.jwt_secret}",
-    "AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://${local.api_host}:8080/execution/",
-    "AIRFLOW__CORE__LOAD_EXAMPLES=False",
-    "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
-    "AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL=30",
-    "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS=${var.admin_user}:admin",
-    "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE=/opt/airflow/passwords/passwords.json",
-    "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK=True",
-  ]
+  connections = {
+    (var.minio_conn_id) = jsonencode({
+      conn_type = "aws"
+      login     = var.minio_user
+      password  = var.minio_password
+      extra = {
+        endpoint_url = var.minio_endpoint
+      }
+    })
+    (var.warehouse_conn_id) = jsonencode({
+      conn_type = "postgres"
+      host      = var.postgres_host
+      port      = 5432
+      schema    = var.warehouse_db
+      login     = var.warehouse_db
+      password  = var.warehouse_password
+    })
+  }
+
+  env = concat(
+    [
+      "AIRFLOW__CORE__EXECUTOR=LocalExecutor",
+      "AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${var.metadata_db}:${var.metadata_password}@${var.postgres_host}:5432/${var.metadata_db}",
+      "AIRFLOW__CORE__FERNET_KEY=${var.fernet_key}",
+      "AIRFLOW__API_AUTH__JWT_SECRET=${var.jwt_secret}",
+      "AIRFLOW__CORE__EXECUTION_API_SERVER_URL=http://${local.api_host}:8080/execution/",
+      "AIRFLOW__CORE__LOAD_EXAMPLES=False",
+      "AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=False",
+      "AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL=30",
+      "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS=${var.admin_user}:admin",
+      "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE=/opt/airflow/passwords/passwords.json",
+      "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK=True",
+      "SDG_DATA_BUCKET=${var.data_bucket}",
+    ],
+    [for id, conn in local.connections : "AIRFLOW_CONN_${upper(id)}=${conn}"],
+  )
 
   services = {
     api-server = {
       healthcheck = ["CMD", "curl", "-fsS", "http://localhost:8080/api/v2/monitor/health"]
       ports       = [{ internal = 8080, external = var.port }]
+      dags        = false
     }
     scheduler = {
       healthcheck = ["CMD", "curl", "-fsS", "http://localhost:8974/health"]
       ports       = []
+      dags        = true
     }
     dag-processor = {
       healthcheck = ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --local"]
       ports       = []
+      dags        = true
     }
   }
 }
@@ -109,6 +135,15 @@ resource "docker_container" "airflow" {
   volumes {
     volume_name    = var.logs_volume
     container_path = "/opt/airflow/logs"
+  }
+
+  dynamic "volumes" {
+    for_each = each.value.dags ? [abspath("${path.module}/dags")] : []
+    content {
+      host_path      = volumes.value
+      container_path = "/opt/airflow/dags"
+      read_only      = true
+    }
   }
 
   networks_advanced {

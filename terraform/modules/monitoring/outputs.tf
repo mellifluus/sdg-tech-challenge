@@ -5,3 +5,8 @@ output "prometheus_url" {
 output "grafana_url" {
   value = "http://${var.bind_address}:${var.grafana_port}"
 }
+
+output "statsd_host" {
+  description = "StatsD exporter hostname on the data network."
+  value       = docker_container.statsd_exporter.hostname
+}

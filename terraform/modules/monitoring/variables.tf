@@ -100,3 +100,8 @@ variable "grafana_admin_password" {
   type        = string
   sensitive   = true
 }
+
+variable "statsd_exporter_image" {
+  description = "Docker image for the StatsD exporter (Airflow metrics)."
+  type        = string
+}

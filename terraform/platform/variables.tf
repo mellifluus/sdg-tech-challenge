@@ -129,6 +129,12 @@ variable "postgres_exporter_image" {
   default     = "prometheuscommunity/postgres-exporter:v0.18.1"
 }
 
+variable "statsd_exporter_image" {
+  description = "StatsD exporter image (Airflow metrics)."
+  type        = string
+  default     = "prom/statsd-exporter:v0.31.0"
+}
+
 variable "grafana_image" {
   description = "Grafana image."
   type        = string

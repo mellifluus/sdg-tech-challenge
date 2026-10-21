@@ -42,3 +42,46 @@ resource "docker_container" "postgres_exporter" {
     }
   }
 }
+
+resource "docker_image" "statsd_exporter" {
+  name         = var.statsd_exporter_image
+  keep_locally = true
+}
+
+resource "docker_container" "statsd_exporter" {
+  name     = "${var.name_prefix}-statsd-exporter"
+  image    = docker_image.statsd_exporter.image_id
+  hostname = "statsd-exporter"
+  restart  = "unless-stopped"
+  command  = ["--statsd.mapping-config=/etc/statsd-exporter/mapping.yml"]
+
+  upload {
+    file    = "/etc/statsd-exporter/mapping.yml"
+    content = file("${path.module}/statsd-mapping.yml")
+  }
+
+  networks_advanced {
+    name    = var.data_network
+    aliases = ["statsd-exporter"]
+  }
+
+  networks_advanced {
+    name    = var.monitoring_network
+    aliases = ["statsd-exporter"]
+  }
+
+  healthcheck {
+    test     = ["CMD", "wget", "-q", "--spider", "http://localhost:9102/metrics"]
+    interval = "15s"
+    timeout  = "5s"
+    retries  = 5
+  }
+
+  dynamic "labels" {
+    for_each = var.labels
+    content {
+      label = labels.key
+      value = labels.value
+    }
+  }
+}

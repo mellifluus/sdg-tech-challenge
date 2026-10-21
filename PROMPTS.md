@@ -34,6 +34,8 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 27 | Airflow tests & graph |
 | 28 | Connectivity check DAG |
 | 29 | Airflow DAG tests |
+| 30 | StatsD mapping for Airflow |
+| 31 | Airflow Grafana dashboard & alerts |
 
 ---
 
@@ -834,5 +836,64 @@ Verified: shellcheck is clean, and `make test` passes 37, fails 0.
 One thing to know: the DAG uses `retries: 1` with the default 5 min `retry_delay`. A failing task would make the poll time out (state `up_for_retry`/`running`) instead of reporting `failed`. The test still fails, and the reason shows in the FAIL message.
 
 **Graph:** no change, since this only touches tests.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#30 · StatsD mapping for Airflow</strong></summary>
+
+> **Prompt**
+>
+> could you make me a statsd-mapping.yml file in the monitoring module that drops the legacy copy of the metrics that bake the ids into their name? and also the histogram settings
+
+**Answer**
+
+Added `terraform/modules/monitoring/statsd-mapping.yml`:
+
+- **Drops** the legacy per-id copies with anchored regex rules, `action: drop`: `ti.start/finish/running/queued/deferred.*`, `dag.<dag>.<task>.*duration`, `dagrun.duration.{success,failed}.<dag>`, `dagrun.schedule_delay|dependency-check.<dag>`, `dagrun.<dag>.first_task_scheduling_delay`, `dag_processing.last_duration|last_run.seconds_ago.<file>`, `pool.*_slots|starving_tasks.<pool>`, `executor.*_slots.<class>`, `operator_{failures,successes}_*`, `task_instance_created_*`, `task_{removed_from,restored_to}_dag.<dag>`, `task.{cpu,mem}_usage.<dag>.<task>`. The tagged copies pass through, and their tags become labels.
+- **Histograms:** `observer_type: histogram` by default, with buckets from 10ms to 60s. Longer buckets (up to 1–2h) for `dagrun.duration.*` and `task.*`.
+
+Checked with `statsd-exporter --check-config` (v0.31.0): it passes.
+
+**Graph:** no change, since nothing new is deployed yet.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#31 · Airflow Grafana dashboard & alerts</strong></summary>
+
+> **Prompt**
+>
+> the stack is running. statsd is up and prometheus is scraping metrics. please make a airflow.json grafana dashboard and add some sensible alerts to grafana-alerts.yaml. you can inspect the metrics emitted if needed
+
+**Answer**
+
+I looked at the live `airflow_*` series and their labels in Prometheus, then built both files on those names.
+
+**`grafana/dashboards/airflow.json`** (uid `sdg-airflow`): same style as the platform overview, with `$datasource` and `$dag_id` variables.
+- **Overview:** scheduler and DAG processor UP/DOWN (heartbeat counter increasing), DAGs loaded, import errors, successful and failed DAG runs in the time range.
+- **DAG runs:** runs finished by outcome (stacked bars), duration p95, running runs, schedule delay.
+- **Tasks:** task instances finished by state, task duration p95, executor slots, scheduled → queued latency.
+- **Scheduler & DAG processing:** loop and critical-section p95, `default_pool` slots, DAG file parse time, seconds since last parse.
+
+**`grafana-alerts.yml`:** new `sdg-airflow` group with 6 rules.
+- Scheduler heartbeat missing (critical).
+- DAG processor heartbeat missing (critical).
+- DAG import errors (warning).
+- DAG run failed, per `dag_id` (critical).
+- Tasks starving for pool slots for 10m (warning).
+- Executor saturated for 10m: no open slots while tasks are queued (warning).
+
+Two gotchas from the data:
+- **New counters:** StatsD counters only appear on their first event, so `increase()` misses a DAG's first failure. The failure queries use `x - (x offset 5m or x * 0)` instead.
+- **Parse-time unit:** `dag_processing.last_duration` is sent in seconds, but the exporter treats it as ms and divides by 1000, so that panel multiplies by 1000.
+
+Every query ran successfully against the live Prometheus, and the YAML parses. Not applied yet: `make up` re-uploads the files to Grafana.
+
+**Graph:** no change, since there are no new containers, networks or ports.
 
 </details>

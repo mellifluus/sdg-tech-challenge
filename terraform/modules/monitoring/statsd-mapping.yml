@@ -1,0 +1,33 @@
+# StatsD exporter config for Airflow. Airflow sends its tags (dag_id, task_id, state, ...)
+# InfluxDB-style (statsd_influxdb_enabled), which the exporter turns into labels, e.g.
+# airflow_dagrun_duration_failed_count{dag_id="ingest_orders", run_type="scheduled"}.
+# Timers become histograms with buckets sized for task/DAG durations (seconds).
+defaults:
+  observer_type: histogram
+  histogram_options:
+    buckets: [0.5, 1, 5, 15, 30, 60, 300, 900, 1800, 3600]
+
+# Airflow also emits a legacy copy of these metrics with the ids baked into the name
+# (airflow.ti.finish.<dag>.<task>.<state>): one Prometheus metric per DAG/task, so drop them.
+mappings:
+  - match: "airflow.dagrun.duration.*.*"
+    name: dropped
+    action: drop
+  - match: "airflow.dagrun.*.first_task_scheduling_delay"
+    name: dropped
+    action: drop
+  - match: "airflow.dagrun.dependency-check.*"
+    name: dropped
+    action: drop
+  - match: "airflow.dagrun.schedule_delay.*"
+    name: dropped
+    action: drop
+  - match: "airflow.ti.finish.*.*.*"
+    name: dropped
+    action: drop
+  - match: "airflow.ti.start.*.*"
+    name: dropped
+    action: drop
+  - match: "airflow.dag.*.*.*"
+    name: dropped
+    action: drop

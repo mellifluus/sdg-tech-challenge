@@ -242,3 +242,190 @@ groups:
               expression: B
               conditions:
                 - evaluator: { type: gt, params: [0] }
+
+  # Airflow metrics come from the StatsD exporter. Heartbeats are counters, so a stalled
+  # component shows up as a flat counter (or no series at all after an exporter restart).
+  - orgId: 1
+    name: sdg-airflow
+    folder: SDG Platform
+    interval: 1m
+    rules:
+      - uid: sdg-airflow-scheduler-down
+        title: Airflow scheduler heartbeat missing
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "The Airflow scheduler has not sent a heartbeat for 3+ minutes"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: "sum(increase(airflow_scheduler_heartbeat[2m])) or vector(0)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: sdg-airflow-dag-processor-down
+        title: Airflow DAG processor heartbeat missing
+        condition: C
+        for: 2m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "The Airflow DAG processor has not sent a heartbeat for 3+ minutes; DAG changes are not picked up"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: "sum(increase(airflow_dag_processor_heartbeat[2m])) or vector(0)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: sdg-airflow-import-errors
+        title: Airflow DAG import errors
+        condition: C
+        for: 2m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $values.B.Value }} DAG file(s) fail to import; check Browse > DAG import errors"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, expr: "sum(airflow_dag_processing_import_errors)", instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      # StatsD counters only exist after their first event, so increase() would miss a DAG's
+      # first-ever failure. Diffing against the 5m-old value (or 0 if the series is new)
+      # catches it.
+      - uid: sdg-airflow-dagrun-failed
+        title: Airflow DAG run failed
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $values.B.Value }} run(s) of DAG {{ $labels.dag_id }} failed in the last 5 minutes"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (dag_id) (clamp_min(airflow_dagrun_duration_failed_count
+                - (airflow_dagrun_duration_failed_count offset 5m or airflow_dagrun_duration_failed_count * 0), 0))
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: sdg-airflow-tasks-starving
+        title: Airflow tasks starving for pool slots
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $values.B.Value }} task(s) in pool {{ $labels.pool_name }} cannot run for lack of slots"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, expr: "sum by (pool_name) (airflow_pool_starving_tasks)", instant: true }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: sdg-airflow-executor-saturated
+        title: Airflow executor saturated
+        condition: C
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "LocalExecutor has no open slots and {{ $values.B.Value }} queued task(s)"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              # Queued tasks only count while no slot is free.
+              expr: "sum(airflow_executor_queued_tasks) and sum(airflow_executor_open_slots) == 0 or vector(0)"
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

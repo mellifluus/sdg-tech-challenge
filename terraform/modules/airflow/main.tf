@@ -46,6 +46,12 @@ locals {
       "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS=${var.admin_user}:admin",
       "AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE=/opt/airflow/passwords/passwords.json",
       "AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK=True",
+      "AIRFLOW__METRICS__STATSD_ON=True",
+      "AIRFLOW__METRICS__STATSD_HOST=${var.statsd_host}",
+      "AIRFLOW__METRICS__STATSD_PORT=9125",
+      "AIRFLOW__METRICS__STATSD_PREFIX=airflow",
+      # without this, tags are not sent to StatsD, and the StatsD exporter does not expose them to Prometheus (?)
+      "AIRFLOW__METRICS__STATSD_INFLUXDB_ENABLED=True",
       "SDG_DATA_BUCKET=${var.data_bucket}",
     ],
     [for id, conn in local.connections : "AIRFLOW_CONN_${upper(id)}=${conn}"],

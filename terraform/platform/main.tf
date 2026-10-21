@@ -69,6 +69,8 @@ module "monitoring" {
   grafana_admin_user     = var.grafana_admin_user
   grafana_admin_password = local.foundation.grafana_admin_password
 
+  statsd_exporter_image = var.statsd_exporter_image
+
   depends_on = [module.postgres, module.minio]
 }
 
@@ -98,6 +100,8 @@ module "airflow" {
   minio_user     = var.minio_app_user
   minio_password = local.foundation.minio_app_password
   data_bucket    = var.minio_buckets[0]
+
+  statsd_host = module.monitoring.statsd_host
 
   # The bootstrap job creates the airflow role/database.
   depends_on = [module.postgres]

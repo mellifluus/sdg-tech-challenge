@@ -23,6 +23,7 @@ flowchart TB
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
             prometheus["prometheus<br/>(metrics, monitoring network only)"]
             pg_exporter["postgres-exporter<br/>(also on sdg-data)"]
+            statsd_exporter["statsd-exporter<br/>(Airflow metrics, also on sdg-data)"]
             grafana["grafana<br/>(dashboards, alerts)"]
         end
         minio_vol[("sdg-minio-data<br/>volume (foundation)")]
@@ -44,6 +45,7 @@ flowchart TB
     prometheus -- "scrape /minio/v2/metrics" --> minio
     prometheus -- "scrape :9187" --> pg_exporter
     pg_exporter -- "pg_monitor role" --> postgres
+    prometheus -- "scrape :9102" --> statsd_exporter
     host -- ":3000 UI" --> grafana
     grafana -- "PromQL datasource" --> prometheus
     grafana --- grafana_vol
@@ -53,6 +55,7 @@ flowchart TB
     af_sched -- "execution API" --> af_api
     af_sched -- "DAG tasks: S3 as app user" --> minio
     af_sched -- "DAG tasks: warehouse DB" --> postgres
+    airflow -- "StatsD :9125/udp" --> statsd_exporter
     af_api --- af_logs_vol
     af_sched --- af_logs_vol
     af_dagp --- af_logs_vol

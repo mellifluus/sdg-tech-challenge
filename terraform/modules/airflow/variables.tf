@@ -118,3 +118,8 @@ variable "data_bucket" {
   description = "Bucket the DAGs read from and write to."
   type        = string
 }
+
+variable "statsd_host" {
+  description = "StatsD exporter hostname Airflow sends metrics to."
+  type        = string
+}

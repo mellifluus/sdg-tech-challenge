@@ -71,3 +71,27 @@ module "monitoring" {
 
   depends_on = [module.postgres, module.minio]
 }
+
+module "airflow" {
+  source = "../modules/airflow"
+
+  name_prefix  = local.foundation.project_name
+  base_image   = var.airflow_image
+  network_name = local.foundation.networks.data
+  bind_address = var.bind_address
+  port         = var.airflow_port
+  labels       = local.common_labels
+  logs_volume  = local.foundation.volumes["airflow-logs"]
+
+  admin_user     = var.airflow_admin_user
+  admin_password = local.foundation.airflow_admin_password
+  fernet_key     = local.foundation.airflow_secrets.fernet_key
+  jwt_secret     = local.foundation.airflow_secrets.jwt_secret
+
+  postgres_host     = module.postgres.internal_host
+  metadata_db       = var.orchestrator_db_name
+  metadata_password = local.foundation.postgres_passwords.orchestrator
+
+  # The bootstrap job creates the airflow role/database.
+  depends_on = [module.postgres]
+}

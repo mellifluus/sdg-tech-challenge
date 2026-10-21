@@ -46,3 +46,18 @@ output "grafana_admin_password" {
   value       = random_password.grafana_admin.result
   sensitive   = true
 }
+
+output "airflow_admin_password" {
+  description = "Airflow admin password."
+  value       = random_password.airflow_admin.result
+  sensitive   = true
+}
+
+output "airflow_secrets" {
+  description = "Airflow internal secrets (fernet key, JWT signing secret)."
+  value = {
+    fernet_key = local.airflow_fernet_key
+    jwt_secret = random_password.airflow_jwt.result
+  }
+  sensitive = true
+}

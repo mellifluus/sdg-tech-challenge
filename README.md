@@ -13,6 +13,12 @@ flowchart TB
             bootstrap["minio-bootstrap<br/>(one-shot mc job)"]
             postgres["postgres<br/>(PostgreSQL server)"]
             pg_bootstrap["postgres-bootstrap<br/>(one-shot psql job)"]
+            subgraph airflow["Airflow (LocalExecutor)"]
+                af_init["airflow-init<br/>(one-shot db migrate)"]
+                af_api["airflow-api-server<br/>(UI, REST API)"]
+                af_sched["airflow-scheduler<br/>(runs tasks)"]
+                af_dagp["airflow-dag-processor<br/>(parses DAGs)"]
+            end
         end
         subgraph sdg-monitoring["sdg-monitoring network (foundation)"]
             prometheus["prometheus<br/>(metrics, monitoring network only)"]
@@ -23,6 +29,7 @@ flowchart TB
         pg_vol[("sdg-postgres-data<br/>volume (foundation)")]
         prom_vol[("sdg-prometheus-data<br/>volume (foundation)")]
         grafana_vol[("sdg-grafana-data<br/>volume (foundation)")]
+        af_logs_vol[("sdg-airflow-logs-data<br/>volume (foundation)")]
     end
     host(["Host"])
 
@@ -40,6 +47,13 @@ flowchart TB
     host -- ":3000 UI" --> grafana
     grafana -- "PromQL datasource" --> prometheus
     grafana --- grafana_vol
+    host -- ":8080 UI / API" --> af_api
+    af_init -- "schema migrations" --> postgres
+    airflow -- "metadata (airflow DB)" --> postgres
+    af_sched -- "execution API" --> af_api
+    af_api --- af_logs_vol
+    af_sched --- af_logs_vol
+    af_dagp --- af_logs_vol
 ```
 
 Two Terraform root modules with separate states: `terraform/foundation` (networks, volumes,
@@ -64,6 +78,9 @@ checks, so it can run as-is in CI.
   reach PostgreSQL directly.
 - **Grafana**: healthy, anonymous API access rejected, Prometheus datasource healthy, the
   overview dashboard is provisioned, and every rule in `grafana-alerts.yml` is loaded.
+- **Airflow**: the api-server is up and reports the metadata DB, scheduler and dag-processor
+  as healthy (polled), anonymous API access is rejected, and the admin user gets a token
+  that the API accepts.
 - **E2E**: streams the fixture out of the bucket into `warehouse.e2e_orders` (truncate + load
   in one transaction) and checks the row count and total.
 

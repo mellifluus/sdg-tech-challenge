@@ -79,6 +79,23 @@ expect_eq "dashboard '$GRAFANA_DASHBOARD' provisioned" "true" \
 expect_eq "alert rules provisioned (one per rule in grafana-alerts.yml)" "$GRAFANA_ALERT_RULES" \
   "$(grafana_api /api/v1/provisioning/alert-rules | jq '[.[] | select(.uid | startswith("sdg-"))] | length')"
 
+# AIRFLOW
+
+section "Airflow"
+expect_ok "api-server healthy ($AIRFLOW)" \
+  curl -fsS --retry 5 --retry-connrefused --retry-delay 2 "$AIRFLOW/api/v2/monitor/health"
+# Heartbeats can lag right after `make up`, so poll.
+poll_eq "metadata database healthy" "healthy" airflow_health metadatabase
+poll_eq "scheduler healthy" "healthy" airflow_health scheduler
+poll_eq "dag-processor healthy" "healthy" airflow_health dag_processor
+expect_eq "anonymous API access rejected" "401" \
+  "$(curl -sS -o /dev/null -w '%{http_code}' "$AIRFLOW/api/v2/dags")"
+
+token=$(airflow_token "$AIRFLOW_USER" "$AIRFLOW_PASSWORD")
+expect_ok "admin user '$AIRFLOW_USER' gets an API token" test -n "$token"
+expect_eq "API accepts the admin token" "200" \
+  "$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "$AIRFLOW/api/v2/dags")"
+
 # E2E: bucket -> warehouse
 
 section "E2E (MinIO -> PostgreSQL)"

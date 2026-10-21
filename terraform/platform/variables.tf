@@ -83,6 +83,26 @@ variable "warehouse_db_name" {
   default     = "warehouse"
 }
 
+# AIRFLOW
+
+variable "airflow_image" {
+  description = "Official Airflow image the local image is built from."
+  type        = string
+  default     = "apache/airflow:3.3.2"
+}
+
+variable "airflow_port" {
+  description = "Host port for the Airflow UI / REST API."
+  type        = number
+  default     = 8080
+}
+
+variable "airflow_admin_user" {
+  description = "Airflow admin user."
+  type        = string
+  default     = "admin"
+}
+
 # MONITORING
 
 variable "prometheus_image" {

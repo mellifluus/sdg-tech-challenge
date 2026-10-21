@@ -81,3 +81,17 @@ output "grafana_admin_password" {
   value     = local.foundation.grafana_admin_password
   sensitive = true
 }
+
+output "airflow" {
+  description = "Airflow endpoint."
+  value = {
+    url        = module.airflow.url
+    admin_user = module.airflow.admin_user
+    image      = module.airflow.image
+  }
+}
+
+output "airflow_admin_password" {
+  value     = local.foundation.airflow_admin_password
+  sensitive = true
+}

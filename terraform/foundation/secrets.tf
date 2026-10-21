@@ -23,3 +23,22 @@ resource "random_password" "grafana_admin" {
   length  = 24
   special = false
 }
+
+resource "random_password" "airflow_admin" {
+  length  = 24
+  special = false
+}
+
+resource "random_password" "airflow_jwt" {
+  length  = 64
+  special = false
+}
+
+# Fernet is 32 bytes b64 encoded, airflow wants it urlsafe so replace + with - and / with _
+resource "random_bytes" "airflow_fernet" {
+  length = 32
+}
+
+locals {
+  airflow_fernet_key = replace(replace(random_bytes.airflow_fernet.base64, "+", "-"), "/", "_")
+}

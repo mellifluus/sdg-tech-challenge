@@ -28,6 +28,9 @@ GRAFANA=$(tf .monitoring.value.grafana_url)
 GRAFANA_AUTH="$(tf .monitoring.value.grafana_user):$(tf .grafana_admin_password.value)"
 GRAFANA_DASHBOARD="sdg-platform-overview"
 GRAFANA_ALERT_RULES=$(grep -c '^ *- uid: sdg-' "$ROOT_DIR/terraform/modules/monitoring/grafana/grafana-alerts.yml")
+AIRFLOW=$(tf .airflow.value.url)
+AIRFLOW_USER=$(tf .airflow.value.admin_user)
+AIRFLOW_PASSWORD=$(tf .airflow_admin_password.value)
 
 # mc aliases "root" and "app", passed to the container by env var name only
 export MC_HOST_root="${MINIO_INTERNAL/:\/\//://$(tf .minio.value.root_user):$(tf .minio_root_password.value)@}"
@@ -95,3 +98,13 @@ sha() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; 
 
 # grafana_api <path>: authenticated GET as the admin user
 grafana_api() { curl -fsS -u "$GRAFANA_AUTH" "$GRAFANA$1" 2>/dev/null; }
+
+# airflow_health <component>: status reported by the api-server (metadatabase, scheduler, dag_processor...)
+airflow_health() { curl -fsS "$AIRFLOW/api/v2/monitor/health" 2>/dev/null | jq -r ".$1.status"; }
+
+# airflow_token <user> <password>: JWT from the simple auth manager, empty if login fails
+airflow_token() {
+  jq -n --arg u "$1" --arg p "$2" '{username: $u, password: $p}' |
+    curl -fsS -X POST "$AIRFLOW/auth/token" -H 'Content-Type: application/json' -d @- 2>/dev/null |
+    jq -r '.access_token // empty'
+}

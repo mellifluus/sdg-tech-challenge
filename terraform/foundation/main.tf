@@ -31,7 +31,7 @@ resource "docker_network" "monitoring" {
 # STORAGE
 
 resource "docker_volume" "data" {
-  for_each = toset(["minio", "postgres", "prometheus", "grafana"])
+  for_each = toset(["minio", "postgres", "prometheus", "grafana", "airflow-logs"])
 
   name = "${var.project_name}-${each.key}-data"
 

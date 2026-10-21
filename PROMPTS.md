@@ -28,6 +28,10 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 21 | Grafana tests & graph |
 | 22 | Persistence test & CI pipeline |
 | 23 | Airflow requirements & graph rule |
+| 24 | Airflow volumes |
+| 25 | cryptography "Illegal instruction" |
+| 26 | Passwords file permission denied |
+| 27 | Airflow tests & graph |
 
 ---
 
@@ -649,5 +653,129 @@ Ran it against the live stack: 26 passed, 0 failed. Updated the README graph wit
 
 - **CLAUDE.md**: added an "Orchestrator (optional extension)" section with the Airflow requirements: Terraform-managed, `LocalExecutor`, metadata in the existing `airflow` DB, output to `warehouse`, MinIO and PostgreSQL connections injected from Terraform, `dags/` mount, a logs volume, Prometheus/Grafana monitoring, and tests. It also lists four example DAGs: `ingest_orders` (MinIO → staging), `sales_kpis_daily` (marts), `data_quality_checks`, and `ml_feature_export` (RFM features as Parquet in MinIO).
 - **Graph rule**: the graph must show only the deployed architecture (no tests, CI or tooling). Applied it right away by removing the tests node and its two edges from the README graph.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#24 · Airflow volumes</strong></summary>
+
+> **Prompt**
+>
+> so, i'm going to start setting airflow up. consider me a full beginner on the topic, but i spent some time learning about it. i have a question. i know i will be able to set it up so that it uses the postgres instance as storage for run metadata etc. but does it need a volume for anything else?
+
+**Answer**
+
+Yes, one thing really needs persistent storage: the **logs**. Everything else is in PostgreSQL or comes from the repo.
+
+| What | Where it lives | Needs a volume? |
+|---|---|---|
+| Run metadata: DAG runs, task states, XComs, connections, users | PostgreSQL (`airflow` DB) | No |
+| **Task logs** | Files on disk (`/opt/airflow/logs`) | **Yes.** They are not stored in the DB |
+| DAG code | Repo `dags/` folder | A **bind mount** (read-only), not a named volume |
+| Plugins / custom config | `plugins/`, `airflow.cfg` | Only if used, as bind mounts too |
+| Temp files a task writes | Container filesystem | No. Scratch space only; real output goes to MinIO or `warehouse` |
+
+- **The logs volume must be shared.** With `LocalExecutor`, tasks run inside the scheduler container, so that's where log files get written. The UI (api-server) reads those same files, so mount the same volume in both containers or the UI shows "log not found".
+- **Alternative: remote logging to MinIO.** Airflow can upload task logs to an S3 bucket (e.g. `data-bucket/airflow-logs/`), which makes the containers fully stateless. A volume is simpler to start with.
+
+Not a volume, but the same kind of "state" concern: keys like the Fernet key must stay the same across container recreations. Airflow uses that key to encrypt the connection passwords it stores in the DB, so if it changes, the stored connections can no longer be decrypted. Generate it in Terraform (e.g. `random_password`) rather than letting the container make a new one.
+
+The architecture graph needed no update.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#25 · cryptography "Illegal instruction"</strong></summary>
+
+> **Prompt**
+>
+> alright, i've got an issue. the airflow container im running manually just dies on every process or import with logs saying "Illegal instruction". I traced the issue to airflow shipping with the python cryptography package > 47. is creating a light Dockerfile based on the airflow image but installing a lower version of cryptography the way to go?
+
+**Answer**
+
+Yes, a small Dockerfile that extends the official image is the right fix. Extending the image is the method the Airflow docs recommend for changing its packages.
+
+**Emulation is ruled out.** The host and the `apache/airflow:3.3.2` images are all native `arm64`, so the crash isn't from running an amd64 image through emulation. That fits the diagnosis: on Docker Desktop's Linux VM, the cryptography ≥47 wheel likely uses a CPU instruction the virtual CPU doesn't support (root cause not verified).
+
+```dockerfile
+FROM apache/airflow:3.3.2
+RUN pip install --no-cache-dir "apache-airflow==${AIRFLOW_VERSION}" "cryptography<47"
+```
+
+- **Keep the Airflow version pin in the same `pip install`.** `AIRFLOW_VERSION` is already set inside the image; pinning it stops pip from changing Airflow while it resolves the new cryptography version.
+- **Check the result** with `python -c "import cryptography; print(cryptography.__version__)"` and `airflow version` in the built image.
+- **Let Terraform build it**, so `make up` stays a single command: the `docker_image` resource's `build { context = ... }` block, plus `triggers = { dockerfile = filesha1(...) }` to rebuild when the Dockerfile changes.
+- **Add a comment in the Dockerfile and a line in the README** explaining why the pin exists, and remove it once a fixed cryptography release ships.
+
+The downside is small: one extra build artifact. A custom image will likely be needed anyway for DAG Python dependencies (e.g. `pyarrow`, the Amazon provider), so it's a good place for the pin.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#26 · Passwords file permission denied</strong></summary>
+
+> **Prompt**
+>
+> the airflow api server container creation hangs. the logs say "2026-10-21 09:53:07 PermissionError: [Errno 13] Permission denied: '/opt/airflow/passwords/passwords.json'"
+>
+> my guess is i need to assign perms to the user trying to access that file. any idea?
+
+**Answer**
+
+The guess is right: it's an ownership problem.
+
+- **Terraform's `upload` writes the file as root.** Docker extracts uploaded files using the owner recorded in the archive (`root`), and creates `/opt/airflow/passwords/` as root too if it doesn't exist yet.
+- **Airflow doesn't run as root.** The image runs as the `airflow` user (uid 50000), and the simple auth manager (as far as I know) *rewrites* the passwords file at startup, so it needs write access, not just read. Hence `Errno 13`.
+- **The "hang" is a crash loop.** `restart = "unless-stopped"` keeps restarting the crashing api-server, and `wait = true` blocks Terraform for the whole 300s `wait_timeout` because it never reports healthy.
+
+Not verified on a live container (none was running). To confirm: `docker exec <api-server> ls -la /opt/airflow/passwords` during the crash loop.
+
+**A `chown` in the Dockerfile won't fix this**, because the upload happens after the image is built and the file is still owned by root. Simplest fix: have the container write the file itself, as `airflow`, at startup:
+
+```hcl
+# api-server only
+env = concat(local.env, [
+  "SIMPLE_AUTH_PASSWORDS=${jsonencode({ (var.admin_user) = var.admin_password })}",
+])
+command = ["bash", "-c", <<-EOT
+  printf '%s' "$SIMPLE_AUTH_PASSWORDS" > /opt/airflow/passwords.json && exec airflow api-server
+EOT
+]
+```
+
+Then set `AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE=/opt/airflow/passwords.json`. `/opt/airflow` is writable by `airflow`, and the image's entrypoint passes `bash -c` commands through unchanged. The password ends up in an env var, like the DB password already does.
+
+**Related cleanup:** only the api-server uses the passwords file. Remove the `upload` block and don't give this setting to the scheduler or dag-processor, e.g. via a per-service `extra_env`/`command` in `local.services`, or a separate api-server resource.
+
+</details>
+
+---
+
+<details>
+<summary><strong>#27 · Airflow tests & graph</strong></summary>
+
+> **Prompt**
+>
+> i fixed it. assigned permissions to the airflow user in the upload block. everything is currently up and healthy, finally. could you please add a couple tests in run.sh? first check that api, scheduler, and dag processor are all healthy. then check that anonymous api reqs are rejected, then check that the admin user gets an api token. finally update graph
+
+**Answer**
+
+- **`tests/lib.sh`**: added `AIRFLOW`, `AIRFLOW_USER` and `AIRFLOW_PASSWORD` (read from `terraform output`), plus two helpers:
+  - `airflow_health <component>` reads `/api/v2/monitor/health`.
+  - `airflow_token` posts to `/auth/token` and returns the JWT. It builds the JSON body with `jq`, so special characters in the password are safe.
+- **`tests/run.sh`**: new Airflow section with seven checks:
+  - The api-server responds.
+  - The metadata DB, scheduler and dag-processor report healthy. These are polled, because heartbeats can lag right after `make up`.
+  - An anonymous `GET /api/v2/dags` returns 401.
+  - The admin user gets a token, and the API accepts it with a 200. That last check is one extra beyond what was asked; it proves the token actually works.
+- **README**: the graph now has an Airflow subgraph on `sdg-data` (init, api-server, scheduler, dag-processor), the `:8080` host port, metadata going to PostgreSQL, the scheduler calling the api-server's execution API, and the `sdg-airflow-logs-data` volume. The Testing section has a new Airflow bullet.
+
+Verified: shellcheck is clean, and `make test` passes 33, fails 0.
 
 </details>

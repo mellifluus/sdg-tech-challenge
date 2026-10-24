@@ -13,34 +13,34 @@ solution is presented — completeness is not mandatory, but structure and reaso
 
 ## Acceptance criteria
 
-- [ ] Terraform manages container lifecycle, internal networks and volumes.
-- [ ] Whole stack deploys reproducibly with a **single command**.
-- [ ] MinIO API reachable on port **9000**, Web Console on port **9001**.
-- [ ] MinIO ready to receive data with persistent storage.
-- [ ] A bucket named **`data-bucket`** exists in MinIO (required for validation).
-- [ ] PostgreSQL instance serving both orchestrator metadata and destination data.
+- [x] Terraform manages container lifecycle, internal networks and volumes.
+- [x] Whole stack deploys reproducibly with a **single command**.
+- [x] MinIO API reachable on port **9000**, Web Console on port **9001**.
+- [x] MinIO ready to receive data with persistent storage.
+- [x] A bucket named **`data-bucket`** exists in MinIO (required for validation).
+- [x] PostgreSQL instance serving both orchestrator metadata and destination data.
 
 ### Nice to have
 
-- [ ] CI/CD pipeline config (GitHub Actions / GitLab CI) automating the Terraform lifecycle.
-- [ ] Platform monitoring.
-- [ ] Data persistence: DB data and files survive container destroy/recreate.
+- [x] CI/CD pipeline config (GitHub Actions / GitLab CI) automating the Terraform lifecycle.
+- [x] Platform monitoring.
+- [x] Data persistence: DB data and files survive container destroy/recreate.
 
 ### Orchestrator (optional extension)
 
 SDG removed the orchestrator from the challenge to keep it simple, but confirmed it can be added.
 The plan is **Apache Airflow**:
 
-- [ ] Airflow (webserver/api-server, scheduler, `LocalExecutor`) deployed by Terraform in
+- [x] Airflow (webserver/api-server, scheduler, `LocalExecutor`) deployed by Terraform in
       `terraform/platform`, same single-command `make up`.
-- [ ] Metadata stored in the existing `airflow` PostgreSQL database; DAG output written to the
+- [x] Metadata stored in the existing `airflow` PostgreSQL database; DAG output written to the
       `warehouse` database.
-- [ ] Airflow connections to MinIO (S3, app user) and `warehouse` injected via env vars from
+- [x] Airflow connections to MinIO (S3, app user) and `warehouse` injected via env vars from
       Terraform — no credentials in DAG code.
-- [ ] DAGs mounted from a repo folder (`dags/`), Airflow logs persisted on a volume.
-- [ ] UI reachable from the host; Airflow metrics scraped by Prometheus (StatsD exporter) and
+- [x] DAGs mounted from a repo folder (`dags/`), Airflow logs persisted on a volume.
+- [x] UI reachable from the host; Airflow metrics scraped by Prometheus (StatsD exporter) and
       a basic Grafana panel/alert for failed DAG runs.
-- [ ] Tests: DAGs import without errors, and an end-to-end DAG run succeeds in `make test`.
+- [x] Tests: DAGs import without errors, and an end-to-end DAG run succeeds in `make test`.
 
 Example DAGs (a consulting company running data/analytics/AI pipelines for clients):
 

@@ -138,9 +138,12 @@ attivi, che il monitoring network non raggiunga direttamente PostgreSQL e che Gr
 datasource, dashboard e alert provisionati e rifiuti gli accessi anonimi.
 
 Su Airflow controlla lo stato di api-server, scheduler e dag-processor, l'autenticazione delle
-API e che ogni DAG in `dags/` sia registrato senza errori di import. Poi avvia il DAG
-`check_connections` e attende che termini con successo, a conferma che le connessioni verso
-MinIO e `warehouse` iniettate da Terraform funzionino. Infine un test end-to-end legge un CSV di
+API e che ogni DAG in `dags/` sia registrato senza errori di import. Poi carica in
+`raw/orders/` un CSV valido e due non validi (header sbagliato e un prezzo con tre decimali dopo
+una riga corretta) e avvia `ingest_orders`. Il test attende che il file valido finisca in
+`processed/` con le sue righe in `staging.orders`, e che gli altri due finiscano in `rejected/`
+senza righe caricate. Verifica anche che la run fallisca, così da far scattare l'alert. Questo
+conferma che le connessioni verso MinIO e `warehouse` iniettate da Terraform funzionano. Infine un test end-to-end legge un CSV di
 esempio dal bucket, lo carica in una tabella di `warehouse` e confronta il numero di record inseriti con il file originale.
 
 ### Test di persistenza

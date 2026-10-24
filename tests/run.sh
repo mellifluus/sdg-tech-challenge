@@ -109,15 +109,67 @@ done
 expect_eq "no DAG import errors" "" \
   "$(airflow_api "$token" /api/v2/importErrors | jq -r '.import_errors | map(.filename) | join(",")')"
 
-run_id=$(airflow_api "$token" /api/v2/dags/check_connections/dagRuns -X POST -d '{"logical_date": null}' |
+# E2E: ingest_orders (MinIO -> Airflow -> PostgreSQL)
+
+section "E2E (ingest_orders)"
+# One valid file and two invalid ones: a wrong header, and a valid row followed by a price with
+# 3 decimals (checks the file is rejected as a whole, with no partial load).
+tag="e2e-$(date +%s)"
+GOOD="$tag-good.csv"
+BAD_HEADER="$tag-bad-header.csv"
+BAD_ROW="$tag-bad-row.csv"
+t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Upload the bad files first: if the DAG lists the prefix between uploads, at least the good
+# file still lands in a later run.
+expect_ok "upload '$BAD_HEADER' to raw/orders/" mc pipe "app/$BUCKET/raw/orders/$BAD_HEADER" <<'CSV'
+id,date,customer
+1,2026-01-01,acme
+CSV
+expect_ok "upload '$BAD_ROW' to raw/orders/" mc pipe "app/$BUCKET/raw/orders/$BAD_ROW" <<'CSV'
+order_id,order_date,customer,product,quantity,unit_price
+9001,2026-01-01,acme,widget,1,9.99
+9002,2026-01-02,acme,widget,1,9.999
+CSV
+expect_ok "upload '$GOOD' to raw/orders/" mc pipe "app/$BUCKET/raw/orders/$GOOD" <"$FIXTURE"
+
+# The DAG runs every 15 min and its sensor may already be waiting, so the files can be picked up
+# by a scheduled run instead of this one (max_active_runs=1). The checks below therefore look at
+# the outcome (where files end up, what is in the table), not at a specific run.
+run_id=$(airflow_api "$token" /api/v2/dags/ingest_orders/dagRuns -X POST -d '{"logical_date": null}' |
   jq -r '.dag_run_id // empty')
-expect_ok "trigger 'check_connections'" test -n "$run_id"
+expect_ok "trigger 'ingest_orders'" test -n "$run_id"
+
 # shellcheck disable=SC2317,SC2329 # invoked via poll_eq
-run_state() {
-  airflow_api "$token" "/api/v2/dags/check_connections/dagRuns/$(jq -rn --arg r "$run_id" '$r | @uri')" | jq -r .state
+file_prefix() {
+  local p
+  for p in processed rejected raw; do
+    if mc stat "root/$BUCKET/$p/orders/$1" >/dev/null 2>&1; then echo "$p"; return; fi
+  done
 }
-# Queued -> running -> success usually takes seconds; allow ~3 min for a cold scheduler.
-POLL_TRIES=90 poll_eq "'check_connections' run succeeds (warehouse + MinIO)" "success" run_state
+# Sensor poke + mapped tasks usually take under a minute; allow ~3 min for a cold scheduler.
+POLL_TRIES=90 poll_eq "'$GOOD' moved to processed/" "processed" file_prefix "$GOOD"
+POLL_TRIES=30 poll_eq "'$BAD_HEADER' moved to rejected/" "rejected" file_prefix "$BAD_HEADER"
+POLL_TRIES=30 poll_eq "'$BAD_ROW' moved to rejected/" "rejected" file_prefix "$BAD_ROW"
+
+loaded() {
+  psql_as "$WH_DB" "$WH_DB" -c "SELECT count(*), coalesce(sum(quantity * unit_price), 0)
+    FROM staging.orders WHERE source_file = 'raw/orders/$1'" 2>/dev/null || true
+}
+expected=$(awk -F, 'NR > 1 { n++; t += $5 * $6 } END { printf "%d|%.2f", n, t }' "$FIXTURE")
+expect_eq "staging.orders rows from '$GOOD' match fixture (count|sum)" "$expected" "$(loaded "$GOOD")"
+expect_eq "no rows loaded from '$BAD_ROW'" "0|0" "$(loaded "$BAD_ROW")"
+
+# check_rejections fails the run after all files are processed, which is what alerts on rejections.
+# shellcheck disable=SC2317,SC2329 # invoked via poll_eq
+failed_runs() {
+  airflow_api "$token" "/api/v2/dags/ingest_orders/dagRuns?state=failed&end_date_gte=$t0" |
+    jq -r '.total_entries > 0'
+}
+POLL_TRIES=30 poll_eq "rejections fail the 'ingest_orders' run" "true" failed_runs
+
+mc rm "root/$BUCKET/processed/orders/$GOOD" "root/$BUCKET/rejected/orders/$BAD_HEADER" \
+  "root/$BUCKET/rejected/orders/$BAD_ROW" >/dev/null 2>&1 || true
 
 # E2E: bucket -> warehouse
 

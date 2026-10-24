@@ -37,6 +37,7 @@ challenge, in chronological order. Expand each entry to see the prompt and the a
 | 30 | StatsD mapping for Airflow |
 | 31 | Airflow Grafana dashboard & alerts |
 | 32 | Readable architecture graph |
+| 33 | `ingest_orders` in the integration tests |
 
 ---
 
@@ -917,5 +918,28 @@ I rewrote the Mermaid graph in `README.md` and rendered it locally with mermaid-
 - **One-shot jobs** have dashed borders, and volumes are yellow cylinders next to their container.
 - **Fewer edges:** Airflow connects to the logs volume and the metadata DB once as a group instead of once per component.
 - **Short labels:** "(foundation)" was removed from every label. A note under the graph explains the styles and that `terraform/foundation` owns all networks and volumes.
+
+</details>
+
+---
+
+<details>
+<summary>#33 · `ingest_orders` in the integration tests</summary>
+
+> **Prompt**
+>
+> i added a new dag, and removed the check_connections dag - since this new one uses all the connections. can you please run it on the tests, and maybe add some failing files to the fixtures/write one inline jsut for the test
+
+**Answer**
+
+In `tests/run.sh` I replaced the `check_connections` trigger with a new "E2E (ingest_orders)" section:
+- **Uploads:** three files go to `raw/orders/` under a unique `e2e-<timestamp>` prefix. The good file is `fixtures/orders.csv`. The two bad files are written inline: one has a wrong header, the other has a valid row followed by a price with 3 decimals, which checks that a file is never partially loaded.
+- **Checks:** after triggering the DAG, the test checks that the good file is in `processed/` and the bad ones are in `rejected/`. It checks that `staging.orders` holds the fixture's rows (count and sum, matched by `source_file`) and none from the bad file. It also checks that an `ingest_orders` run failed after the test started (`check_rejections`).
+- **Why outcomes, not a specific run:** a scheduled run (every 15 min, with a sensor that can wait for 10 min, and `max_active_runs=1`) may pick up the files before the manual run does.
+- **Cleanup:** the test removes its files from the bucket at the end.
+
+The README paragraph now describes this test.
+
+**Graph:** no change.
 
 </details>
